@@ -1,9 +1,15 @@
 
-use image::{DynamicImage, GenericImageView, imageops::FilterType, Luma, LumaA, Rgb, Rgba, Bgr, Bgra};
+use image::{
+    DynamicImage, DynamicImage::*,
+    GenericImageView, imageops::FilterType, Luma, LumaA, Rgb, Rgba, Bgr, Bgra
+};
 use imageproc::{
+    definitions::Clamp,
     filter::gaussian_blur_f32,
     geometric_transformations::{Interpolation, rotate_about_center},
+    gradients::sobel_gradient_map
 };
+use std::cmp;
 
 #[derive(Debug)]
 pub enum Stage {
@@ -14,7 +20,9 @@ pub enum Stage {
     /// Convert to grayscale.
     Gray,
     /// Rotate clockwise about the image's center by the given angle in degrees.
-    Rotate(f32)
+    Rotate(f32),
+    /// Compute image gradients using the Sobel filter.
+    Sobel
 }
 
 impl Stage {
@@ -32,6 +40,9 @@ impl Stage {
             },
             Self::Rotate(t) => {
                 image.rotate(*t)
+            },
+            Self::Sobel => {
+                image.sobel()
             }
         }
     }
@@ -43,6 +54,7 @@ impl Stage {
             "gaussian" => Stage::Gaussian(split[1].parse().unwrap()),
             "gray" => Stage::Gray,
             "rotate" => Stage::Rotate(split[1].parse().unwrap()),
+            "sobel" => Stage::Sobel,
             _ => panic!("Unrecognised stage name {}", split[0]),
         }
     }
@@ -51,11 +63,11 @@ impl Stage {
 trait ImageExt {
     fn gaussian(&self, sigma: f32) -> Self;
     fn rotate(&self, theta: f32) -> Self;
+    fn sobel(&self) -> Self;
 }
 
 impl ImageExt for DynamicImage {
     fn gaussian(&self, sigma: f32) -> Self {
-        use DynamicImage::*;
         match self {
             ImageLuma8(image) => ImageLuma8(gaussian_blur_f32(image, sigma)),
             ImageLumaA8(image) => ImageLumaA8(gaussian_blur_f32(image, sigma)),
@@ -67,7 +79,6 @@ impl ImageExt for DynamicImage {
     }
 
     fn rotate(&self, theta: f32) -> Self {
-        use DynamicImage::*;
         let rad = theta * std::f32::consts::PI / 180.0;
         match self {
             ImageLuma8(image) => ImageLuma8(
@@ -87,6 +98,30 @@ impl ImageExt for DynamicImage {
             ),
             ImageBgra8(image) => ImageBgra8(
                 rotate_about_center(image, rad, Interpolation::Bilinear, Bgra([0, 0, 0, 0]))
+            ),
+        }
+    }
+
+    fn sobel(&self) -> Self {
+        let clamp_to_u8 = |x| { <u8 as Clamp<u16>>::clamp(x) };
+        match self {
+            ImageLuma8(image) => ImageLuma8(
+                sobel_gradient_map(image, |p| Luma([clamp_to_u8(p[0])]))
+            ),
+            ImageLumaA8(image) => ImageLuma8(
+                sobel_gradient_map(image, |p| Luma([clamp_to_u8(p[0])]))
+            ),
+            ImageRgb8(image) => ImageLuma8(
+                sobel_gradient_map(image, |p| Luma([clamp_to_u8(cmp::max(cmp::max(p[0], p[1]), p[2]))]))
+            ),
+            ImageRgba8(image) => ImageLuma8(
+                sobel_gradient_map(image, |p| Luma([clamp_to_u8(cmp::max(cmp::max(p[0], p[1]), p[2]))]))
+            ),
+            ImageBgr8(image) => ImageLuma8(
+                sobel_gradient_map(image, |p| Luma([clamp_to_u8(cmp::max(cmp::max(p[0], p[1]), p[2]))]))
+            ),
+            ImageBgra8(image) => ImageLuma8(
+                sobel_gradient_map(image, |p| Luma([clamp_to_u8(cmp::max(cmp::max(p[0], p[1]), p[2]))]))
             ),
         }
     }

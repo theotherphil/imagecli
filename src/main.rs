@@ -1,6 +1,7 @@
 use std::path::PathBuf;
+use std::fmt;
 use structopt::StructOpt;
-use image::{DynamicImage, GenericImageView, open, imageops::FilterType};
+use image::{DynamicImage, GenericImageView, open, ImageError, imageops::FilterType};
 use imageproc::filter::gaussian_blur_f32;
 
 #[derive(StructOpt, Debug)]
@@ -22,11 +23,40 @@ struct Opt {
     pipeline: Option<String>,
 }
 
+#[derive(Debug)]
+enum ImageCliError {
+    ImageError(ImageError),
+    IoError(std::io::Error),
+}
+
+impl From<ImageError> for ImageCliError {
+    fn from(error: ImageError) -> Self {
+        ImageCliError::ImageError(error)
+    }
+}
+
+impl From<std::io::Error> for ImageCliError {
+    fn from(error: std::io::Error) -> Self {
+        ImageCliError::IoError(error)
+    }
+}
+
+impl fmt::Display for ImageCliError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            ImageCliError::ImageError(e) => e.fmt(f),
+            ImageCliError::IoError(e) => e.fmt(f),
+        }
+    }
+}
+
+type Result<T> = std::result::Result<T, ImageCliError>;
+
 // cargo run --release -- -v -i images/robin.jpg -o images/morphed.png -p 'gray > gaussian 10.0 > scale 0.3'
-fn main() {
+fn main() -> Result<()> {
     let opt = Opt::from_args();
     let verbose = opt.verbose > 0;
-    let input = open(&opt.input).unwrap();
+    let input = open(&opt.input)?;
     if verbose {
         println!("Input image {:?} (width: {}, height: {})", &opt.input, input.width(), input.height());
     }
@@ -39,7 +69,9 @@ fn main() {
     if verbose {
         println!("Output image {:?} (width: {}, height: {})", &opt.output, output.width(), output.height());
     }
-    output.save(&opt.output).unwrap();
+    output.save(&opt.output)?;
+
+    Ok(())
 }
 
 fn process(input: DynamicImage, pipeline: &[Stage], verbose: bool) -> DynamicImage {

@@ -1,0 +1,13 @@
+[package]
+name = "imagecli"
+version = "0.1.0"
+authors = ["phil <phil.j.ellison@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+image = "0.22.1"
+imageproc = "0.19"
+structopt = "0.3"
+clap = "2.33.0"

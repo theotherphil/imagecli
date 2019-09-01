@@ -22,3 +22,9 @@ cargo run --release -- -v -i images/robin.jpg -o images/2.png -p 'sobel'
 </pre>
 
 <img src="images/2.png" alt="Output"/>
+
+<pre>
+cargo run --release -- -v -i images/robin.jpg -o images/3.png -p 'carve 0.85'
+</pre>
+
+<img src="images/3.png" alt="Output"/>

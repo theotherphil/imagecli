@@ -7,7 +7,8 @@ use imageproc::{
     definitions::Clamp,
     filter::gaussian_blur_f32,
     geometric_transformations::{Interpolation, rotate_about_center},
-    gradients::sobel_gradient_map
+    gradients::sobel_gradient_map,
+    seam_carving::shrink_width,
 };
 use std::cmp;
 
@@ -22,7 +23,9 @@ pub enum Stage {
     /// Rotate clockwise about the image's center by the given angle in degrees.
     Rotate(f32),
     /// Compute image gradients using the Sobel filter.
-    Sobel
+    Sobel,
+    /// Apply seam carving to shrink the image to a provided multiple of its original width.
+    Carve(f32),
 }
 
 impl Stage {
@@ -43,6 +46,9 @@ impl Stage {
             },
             Self::Sobel => {
                 image.sobel()
+            },
+            Self::Carve(r) => {
+                image.carve(*r)
             }
         }
     }
@@ -55,6 +61,7 @@ impl Stage {
             "gray" => Stage::Gray,
             "rotate" => Stage::Rotate(split[1].parse().unwrap()),
             "sobel" => Stage::Sobel,
+            "carve" => Stage::Carve(split[1].parse().unwrap()),
             _ => panic!("Unrecognised stage name {}", split[0]),
         }
     }
@@ -64,6 +71,7 @@ trait ImageExt {
     fn gaussian(&self, sigma: f32) -> Self;
     fn rotate(&self, theta: f32) -> Self;
     fn sobel(&self) -> Self;
+    fn carve(&self, ratio: f32) -> Self;
 }
 
 impl ImageExt for DynamicImage {
@@ -123,6 +131,19 @@ impl ImageExt for DynamicImage {
             ImageBgra8(image) => ImageLuma8(
                 sobel_gradient_map(image, |p| Luma([clamp_to_u8(cmp::max(cmp::max(p[0], p[1]), p[2]))]))
             ),
+        }
+    }
+
+    fn carve(&self, ratio: f32) -> Self {
+        assert!(ratio <= 1.0);
+        let target_width = (self.width() as f32 * ratio) as u32;
+        match self {
+            ImageLuma8(image) => ImageLuma8(shrink_width(image, target_width)),
+            ImageLumaA8(image) => ImageLumaA8(shrink_width(image, target_width)),
+            ImageRgb8(image) => ImageRgb8(shrink_width(image, target_width)),
+            ImageRgba8(image) => ImageRgba8(shrink_width(image, target_width)),
+            ImageBgr8(image) => ImageBgr8(shrink_width(image, target_width)),
+            ImageBgra8(image) => ImageBgra8(shrink_width(image, target_width)),
         }
     }
 }

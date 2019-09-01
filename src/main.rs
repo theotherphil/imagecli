@@ -6,7 +6,7 @@ mod error;
 use crate::error::Result;
 
 mod stage;
-use stage::Graph;
+use stage::run_pipeline;
 
 #[derive(StructOpt, Debug)]
 struct Opt {
@@ -35,8 +35,7 @@ fn main() -> Result<()> {
         println!("Input image {:?} (width: {}, height: {})", &opt.input, input.width(), input.height());
     }
     let output = if opt.pipeline.is_some() {
-        let graph = Graph::parse(&opt.pipeline.unwrap());
-        graph.process(input, opt.verbose > 0)
+        run_pipeline(&opt.pipeline.unwrap(), vec![input], opt.verbose > 0)
     } else {
         input
     };

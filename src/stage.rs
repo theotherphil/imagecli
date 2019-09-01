@@ -4,6 +4,7 @@ use image::{
     GenericImageView, imageops::FilterType, Luma, LumaA, Rgb, Rgba, Bgr, Bgra
 };
 use imageproc::{
+    contrast::{adaptive_threshold, otsu_level, threshold},
     definitions::Clamp,
     filter::gaussian_blur_f32,
     geometric_transformations::{Interpolation, rotate_about_center},
@@ -26,6 +27,10 @@ pub enum Stage {
     Sobel,
     /// Apply seam carving to shrink the image to a provided multiple of its original width.
     Carve(f32),
+    /// Binarises the image using an adaptive thresholding with given block radius.
+    AdaptiveThreshold(u32),
+    /// Binarises the image using Otsu thresholding.
+    OtsuThreshold,
 }
 
 impl Stage {
@@ -49,6 +54,12 @@ impl Stage {
             },
             Self::Carve(r) => {
                 image.carve(*r)
+            },
+            Self::AdaptiveThreshold(r) => {
+                image.adaptive_threshold(*r)
+            },
+            Self::OtsuThreshold => {
+                image.otsu_threshold()
             }
         }
     }
@@ -62,6 +73,8 @@ impl Stage {
             "rotate" => Stage::Rotate(split[1].parse().unwrap()),
             "sobel" => Stage::Sobel,
             "carve" => Stage::Carve(split[1].parse().unwrap()),
+            "athresh" => Stage::AdaptiveThreshold(split[1].parse().unwrap()),
+            "othresh" => Stage::OtsuThreshold,
             _ => panic!("Unrecognised stage name {}", split[0]),
         }
     }
@@ -72,6 +85,8 @@ trait ImageExt {
     fn rotate(&self, theta: f32) -> Self;
     fn sobel(&self) -> Self;
     fn carve(&self, ratio: f32) -> Self;
+    fn adaptive_threshold(&self, block_radius: u32) -> Self;
+    fn otsu_threshold(&self) -> Self;
 }
 
 impl ImageExt for DynamicImage {
@@ -145,5 +160,15 @@ impl ImageExt for DynamicImage {
             ImageBgr8(image) => ImageBgr8(shrink_width(image, target_width)),
             ImageBgra8(image) => ImageBgra8(shrink_width(image, target_width)),
         }
+    }
+
+    fn adaptive_threshold(&self, block_radius: u32) -> Self {
+        let gray = self.to_luma();
+        ImageLuma8(adaptive_threshold(&gray, block_radius))
+    }
+
+    fn otsu_threshold(&self) -> Self {
+        let gray = self.to_luma();
+        ImageLuma8(threshold(&gray, otsu_level(&gray)))
     }
 }

@@ -27,7 +27,6 @@ struct Opt {
     pipeline: Option<String>,
 }
 
-// cargo run --release -- -v -i images/robin.jpg -o images/morphed.png -p 'gray > gaussian 10.0 > scale 0.3 > rotate 45'
 fn main() -> Result<()> {
     let opt = Opt::from_args();
     let verbose = opt.verbose > 0;

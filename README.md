@@ -30,13 +30,7 @@ cargo run --release -- -v -i images/robin.jpg -o images/3.png -p 'carve 0.85'
 <img src="images/3.png" alt="Output"/>
 
 <pre>
-cargo run --release -- -v -i images/robin.jpg -o images/4.png -p 'athresh 10'
+cargo run --release -- -v -i images/robin.jpg -o images/4.png -p 'a = scale 0.4 > athresh 10; o = scale 0.4 > othresh; hcat a o'
 </pre>
 
 <img src="images/4.png" alt="Output"/>
-
-<pre>
-cargo run --release -- -v -i images/robin.jpg -o images/5.png -p 'othresh'
-</pre>
-
-<img src="images/5.png" alt="Output"/>

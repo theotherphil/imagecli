@@ -1,7 +1,7 @@
 
 use image::{
     DynamicImage, DynamicImage::*,
-    GenericImageView, imageops::FilterType, Luma, LumaA, Rgb, Rgba, Bgr, Bgra
+    GenericImage, GenericImageView, imageops::FilterType, Luma, LumaA, Rgb, Rgba, Bgr, Bgra
 };
 use imageproc::{
     contrast::{adaptive_threshold, otsu_level, threshold},
@@ -12,6 +12,56 @@ use imageproc::{
     seam_carving::shrink_width,
 };
 use std::cmp;
+use std::collections::HashMap;
+
+/// A variable in the image pipeline.
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+pub struct Var(String);
+
+pub struct Graph {
+    pipelines: Vec<(Var, Vec<Stage>)>
+}
+
+impl Graph {
+    pub fn parse(definition: &str) -> Self {
+        let mut pipelines = Vec::new();
+        for p in definition.split(';') {
+            // TODO: only the final pipeline is allowed to be missing a variable
+            // TODO: topological sort?
+            // TODO: validate input (e.g. only one equals sign). Create a proper grammar
+            let split: Vec<&str> = p.split('=').map(|s| s.trim()).collect();
+            let name = if split.len() > 1 { Var(split[0].into()) } else { Var(String::from("FINAL")) };
+            let stages = split.last().unwrap().split('>').map(|s| s.trim()).map(Stage::parse).collect();
+            pipelines.push((name, stages));
+        }
+        Graph { pipelines }
+    }
+
+    pub fn process(&self, input: DynamicImage, verbose: bool) -> DynamicImage {
+        let mut var_to_image = HashMap::new();
+        for (var, pipeline) in &self.pipelines {
+            let mut output = input.clone();
+            // TODO: write something that makes a bit more sense!
+            for stage in pipeline {
+                if verbose {
+                    println!("Applying stage {:?}", stage);
+                }
+                output = match stage {
+                    Stage::HCat(l, r) => {
+                        let inputs = vec![&var_to_image[&l], &var_to_image[&r]];
+                        stage.apply(&inputs)
+                    },
+                    _ => {
+                        let inputs = vec![&output];
+                        stage.apply(&inputs)
+                    }
+                }
+            }
+            var_to_image.insert(var, output);
+        }
+        var_to_image[&Var(String::from("FINAL"))].clone()
+    }
+}
 
 #[derive(Debug)]
 pub enum Stage {
@@ -31,35 +81,48 @@ pub enum Stage {
     AdaptiveThreshold(u32),
     /// Binarises the image using Otsu thresholding.
     OtsuThreshold,
+    /// The horizontal concatenation of two named images.
+    HCat(Var, Var),
 }
 
 impl Stage {
-    pub fn apply(&self, image: &DynamicImage) -> DynamicImage {
+    pub fn apply(&self, images: &[&DynamicImage]) -> DynamicImage {
         match self {
             Self::Scale(s) => {
+                let image = images[0];
                 let (w, h) = ((image.width() as f32 * s) as u32, (image.height() as f32 * s) as u32);
                 image.resize(w, h, FilterType::Lanczos3)
             },
             Self::Gaussian(s) => {
+                let image = images[0];
                 image.gaussian(*s)
             },
             Self::Gray => {
+                let image = images[0];
                 image.grayscale()
             },
             Self::Rotate(t) => {
+                let image = images[0];
                 image.rotate(*t)
             },
             Self::Sobel => {
+                let image = images[0];
                 image.sobel()
             },
             Self::Carve(r) => {
+                let image = images[0];
                 image.carve(*r)
             },
             Self::AdaptiveThreshold(r) => {
+                let image = images[0];
                 image.adaptive_threshold(*r)
             },
             Self::OtsuThreshold => {
+                let image = images[0];
                 image.otsu_threshold()
+            },
+            Self::HCat(_l, _r) => {
+                hcat(images[0], images[1])
             }
         }
     }
@@ -75,6 +138,7 @@ impl Stage {
             "carve" => Stage::Carve(split[1].parse().unwrap()),
             "athresh" => Stage::AdaptiveThreshold(split[1].parse().unwrap()),
             "othresh" => Stage::OtsuThreshold,
+            "hcat" => Stage::HCat(Var(split[1].into()), Var(split[2].into())),
             _ => panic!("Unrecognised stage name {}", split[0]),
         }
     }
@@ -87,6 +151,17 @@ trait ImageExt {
     fn carve(&self, ratio: f32) -> Self;
     fn adaptive_threshold(&self, block_radius: u32) -> Self;
     fn otsu_threshold(&self) -> Self;
+}
+
+fn hcat(left: &DynamicImage, right: &DynamicImage) -> DynamicImage {
+    // TODO: do this properly!
+    let left = left.to_luma();
+    let right = right.to_luma();
+    let (w, h) = (left.width() + right.width(), cmp::max(left.height(), right.height()));
+    let mut out = image::ImageBuffer::new(w, h);
+    out.copy_from(&left, 0, 0);
+    out.copy_from(&right, left.width(), 0);
+    ImageLuma8(out)
 }
 
 impl ImageExt for DynamicImage {

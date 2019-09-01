@@ -22,7 +22,7 @@ struct Opt {
     pipeline: Option<String>,
 }
 
-// cargo run --release -- -v -i robin.jpg -o morphed.png -p 'gray > gaussian 5.0 > scale 0.3'
+// cargo run --release -- -v -i images/robin.jpg -o images/morphed.png -p 'gray > gaussian 10.0 > scale 0.3'
 fn main() {
     let opt = Opt::from_args();
     let verbose = opt.verbose > 0;
@@ -36,6 +36,9 @@ fn main() {
     } else {
         input
     };
+    if verbose {
+        println!("Output image {:?} (width: {}, height: {})", &opt.output, output.width(), output.height());
+    }
     output.save(&opt.output).unwrap();
 }
 

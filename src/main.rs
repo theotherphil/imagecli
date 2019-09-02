@@ -15,18 +15,6 @@ type ImageStack = stack::Stack<DynamicImage>;
 // TODO:
 // - support different signatures in Array op
 // - write grid properly, and either remove hcat and vcat or just make them shorthand for grid 2 1 and grid 1 2
-// - at the end of processing, read images off the stack and write as many as we have output names for
-//      example flows
-//          read two inputs
-//              first: blur
-//              second: sharpen
-//          finally: hcat blur sharpen
-// 
-//          read one input
-//              hcat (red channel input) (blue channel input)
-// 
-//          read one input 
-//              write red, blue and green channels as separate images
 //  - add constant images
 //  - add ability to add margins
 //  - support user-defined functions over pixels, e.g. map \x -> x * 0.3

@@ -65,3 +65,9 @@ cargo run --release -- -v -i images/robin.jpg -o images/10.png -p 'scale 0.4 > D
 </pre>
 
 <img src="images/10.png" alt="Output"/>
+
+<pre>
+cargo run --release -- -v -i images/robin.jpg -o images/11.png -p 'DUP 2 > blue > ROT 3 > green > ROT 2 > red > hcat > hcat'
+</pre>
+
+<img src="images/11.png" alt="Output"/>

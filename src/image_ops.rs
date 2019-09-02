@@ -44,6 +44,9 @@ pub fn parse(op: &str) -> Option<Box<dyn ImageOp>> {
         "vcat" => Some(Box::new(VCat)),
         "grid" => Some(Box::new(Grid(split[1].parse().unwrap(), split[2].parse().unwrap()))),
         "median" => Some(Box::new(Median(split[1].parse().unwrap(), split[2].parse().unwrap()))),
+        "red" => Some(Box::new(Red)),
+        "green" => Some(Box::new(Green)),
+        "blue" => Some(Box::new(Blue)),
         _ => None,
     }
 }
@@ -335,4 +338,52 @@ impl ImageOp for Array {
             stack.push(result);
         }
     }
+}
+
+/// Extract the red channel from an image.
+#[derive(Debug)]
+struct Red;
+
+impl ImageOp for Red {
+    fn apply(&self, stack: &mut ImageStack) {
+        one_in_one_out(stack, red);
+    }
+}
+
+fn red(image: &DynamicImage) -> DynamicImage {
+    use imageproc::map::red_channel;
+    let rgb = image.to_rgb();
+    ImageLuma8(red_channel(&rgb))
+}
+
+/// Extract the green channel from an image.
+#[derive(Debug)]
+struct Green;
+
+impl ImageOp for Green {
+    fn apply(&self, stack: &mut ImageStack) {
+        one_in_one_out(stack, green);
+    }
+}
+
+fn green(image: &DynamicImage) -> DynamicImage {
+    use imageproc::map::green_channel;
+    let rgb = image.to_rgb();
+    ImageLuma8(green_channel(&rgb))
+}
+
+/// Extract the blue channel from an image.
+#[derive(Debug)]
+struct Blue;
+
+impl ImageOp for Blue {
+    fn apply(&self, stack: &mut ImageStack) {
+        one_in_one_out(stack, blue);
+    }
+}
+
+fn blue(image: &DynamicImage) -> DynamicImage {
+    use imageproc::map::blue_channel;
+    let rgb = image.to_rgb();
+    ImageLuma8(blue_channel(&rgb))
 }

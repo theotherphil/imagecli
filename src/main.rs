@@ -5,8 +5,10 @@ use image::{GenericImageView, open};
 mod error;
 use crate::error::Result;
 
-mod stage;
-use stage::run_pipeline;
+mod op;
+use op::run_pipeline;
+
+mod stack;
 
 #[derive(StructOpt, Debug)]
 struct Opt {

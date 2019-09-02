@@ -11,6 +11,7 @@ use imageproc::{
     gradients::sobel_gradient_map,
     seam_carving::shrink_width,
 };
+use crate::stack::Stack;
 use std::cmp;
 
 // TODO:
@@ -28,6 +29,8 @@ use std::cmp;
 //          read one input 
 //              write red, blue and green channels as separate images
 //  - add vcat
+//  - add constant images
+//  - add ability to add margins
 //  - support user-defined functions over pixels, e.g. map \x -> x * 0.3
 //  - add support for everything else relevant from imageproc
 //  - add validation for parsing of individual stages (make them subcommands somehow?)
@@ -35,77 +38,6 @@ use std::cmp;
 //      e.g. make -p 'scale 0.4' equivalent to --scale 0.4
 //  - add stages with optional parameters. e.g. rotate uses image centre by default, but user
 //      can specify a centre of rotation if they like
-
-pub struct Stack<T> {
-    // The top of the stack is the last element in the vector.
-    contents: Vec<T>,
-}
-
-// TODO: Write tests for all Stack functions.
-impl<T: Clone> Stack<T> {
-    /// Create a stack with the given initial elements.
-    /// The top of the stack is the last item in the provided vector.
-    pub fn new(contents: Vec<T>) -> Self {
-        Stack { contents }
-    }
-
-    fn len(&self) -> usize {
-        self.contents.len()
-    }
-
-    fn assert_stack_size(&self, op: &str, required: usize) {
-        assert!(
-            self.len() >= required,
-            "operation {} requires {} elements, but the stack only contains {}",
-            op, required, self.len()
-        );
-    }
-
-    // dup ( a -- a a )
-    fn dup(&mut self) {
-        self.assert_stack_size("dup", 1);
-        self.contents.push(self.contents[self.len() - 1].clone());
-    }
-
-    // drop ( a -- )
-    fn drop(&mut self) {
-        self.assert_stack_size("drop", 1);
-        self.contents.remove(self.len() - 1);
-    }
-
-    // swap ( a b -- b a )
-    fn swap(&mut self) {
-        self.assert_stack_size("swap", 2);
-        let (i, j) = (self.len() - 1, self.len() - 2);
-        self.contents.swap(i, j);
-    }
-
-    // over ( a b -- a b a )
-    fn over(&mut self) {
-        self.assert_stack_size("over", 2);
-        let a = self.contents[self.len() - 1].clone();
-        self.contents.insert(self.len() - 2, a);
-    }
-
-    // rot ( a b c -- b c a )
-    fn rot(&mut self) {
-        self.assert_stack_size("rot", 3);
-        let a = self.contents[self.len() - 1].clone();
-        self.contents.remove(self.contents.len() - 1);
-        self.contents.insert(self.len() - 3, a);
-    }
-
-    // pops the top of the stack.
-    fn pop(&mut self) -> T {
-        assert!(!self.contents.is_empty(), "cannot pop an empty stack");
-        self.contents.pop().unwrap()
-    }
-
-    // pushes onto the top of the stack.
-    fn push(&mut self, x: T) {
-        self.contents.push(x);
-    }
-}
 
 type ImageStack = Stack<DynamicImage>;
 
@@ -117,7 +49,7 @@ pub fn run_pipeline(pipeline: &str, inputs: Vec<DynamicImage>, verbose: bool) ->
 
     for op in ops {
         if verbose {
-            println!("Applying op {:?}", op);
+            println!("Applying {:?}", op);
         }
         op.apply(&mut stack);
     }
@@ -197,50 +129,57 @@ pub enum ImageOp {
     OtsuThreshold,
     /// Horizontally concatenate two images.
     HCat,
+    /// Vertically concatenate two images.
+    VCat,
 }
 
 impl ImageOp {
     pub fn apply(&self, stack: &mut ImageStack) {
-        match self {
+        let result = match self {
             Self::Scale(s) => {
                 let image = stack.pop();
-                let (w, h) = ((image.width() as f32 * s) as u32, (image.height() as f32 * s) as u32);
-                stack.push(image.resize(w, h, FilterType::Lanczos3));
+                image.scale(*s)
             },
             Self::Gaussian(s) => {
                 let image = stack.pop();
-                stack.push(image.gaussian(*s));
+                image.gaussian(*s)
             },
             Self::Gray => {
                 let image = stack.pop();
-                stack.push(image.grayscale());
+                image.grayscale()
             },
             Self::Rotate(t) => {
                 let image = stack.pop();
-                stack.push(image.rotate(*t));
+                image.rotate(*t)
             },
             Self::Sobel => {
                 let image = stack.pop();
-                stack.push(image.sobel());
+                image.sobel()
             },
             Self::Carve(r) => {
                 let image = stack.pop();
-                stack.push(image.carve(*r));
+                image.carve(*r)
             },
             Self::AdaptiveThreshold(r) => {
                 let image = stack.pop();
-                stack.push(image.adaptive_threshold(*r));
+                image.adaptive_threshold(*r)
             },
             Self::OtsuThreshold => {
                 let image = stack.pop();
-                stack.push(image.otsu_threshold());
+                image.otsu_threshold()
             },
             Self::HCat => {
                 let l = stack.pop();
                 let r = stack.pop();
-                stack.push(hcat(&l, &r));
-            }
-        }
+                hcat(&l, &r)
+            },
+            Self::VCat => {
+                let l = stack.pop();
+                let r = stack.pop();
+                vcat(&l, &r)
+            },
+        };
+        stack.push(result);
     }
 
     pub fn parse(op: &str) -> Option<ImageOp> {
@@ -255,12 +194,14 @@ impl ImageOp {
             "athresh" => Some(ImageOp::AdaptiveThreshold(split[1].parse().unwrap())),
             "othresh" => Some(ImageOp::OtsuThreshold),
             "hcat" => Some(ImageOp::HCat),
+            "vcat" => Some(ImageOp::VCat),
             _ => None,
         }
     }
 }
 
 trait ImageExt {
+    fn scale(&self, scale: f32) -> Self;
     fn gaussian(&self, sigma: f32) -> Self;
     fn rotate(&self, theta: f32) -> Self;
     fn sobel(&self) -> Self;
@@ -270,17 +211,33 @@ trait ImageExt {
 }
 
 fn hcat(left: &DynamicImage, right: &DynamicImage) -> DynamicImage {
-    // TODO: do this properly!
-    let left = left.to_luma();
-    let right = right.to_luma();
+    // TODO: handle formats properly
+    let left = left.to_rgba();
+    let right = right.to_rgba();
     let (w, h) = (left.width() + right.width(), cmp::max(left.height(), right.height()));
     let mut out = image::ImageBuffer::new(w, h);
     out.copy_from(&left, 0, 0);
     out.copy_from(&right, left.width(), 0);
-    ImageLuma8(out)
+    ImageRgba8(out)
+}
+
+fn vcat(top: &DynamicImage, bottom: &DynamicImage) -> DynamicImage {
+    // TODO: handle formats properly
+    let top = top.to_rgba();
+    let bottom = bottom.to_rgba();
+    let (w, h) = (cmp::max(top.width(), bottom.width()), top.height() + bottom.height());
+    let mut out = image::ImageBuffer::new(w, h);
+    out.copy_from(&top, 0, 0);
+    out.copy_from(&bottom, 0, top.height());
+    ImageRgba8(out)
 }
 
 impl ImageExt for DynamicImage {
+    fn scale(&self, scale: f32) -> Self {
+        let (w, h) = ((self.width() as f32 * scale) as u32, (self.height() as f32 * scale) as u32);
+        self.resize(w, h, FilterType::Lanczos3)
+    }
+
     fn gaussian(&self, sigma: f32) -> Self {
         match self {
             ImageLuma8(image) => ImageLuma8(gaussian_blur_f32(image, sigma)),

@@ -52,8 +52,17 @@ impl<T: Clone> Stack<T> {
 
     /// pops the top of the stack.
     pub fn pop(&mut self) -> T {
-        assert!(!self.contents.is_empty(), "cannot pop an empty stack");
+        self.assert_stack_size("pop", 1);
         self.contents.pop().unwrap()
+    }
+
+    /// pops the to n elements of the stack.
+    pub fn pop_n(&mut self, n: usize) -> Vec<T> {
+        self.assert_stack_size("pop_n", n);
+        // TODO: remove unnecessary work
+        let mut popped = self.contents.split_off(self.len() - n);
+        popped.reverse();
+        popped
     }
 
     /// pushes onto the top of the stack.

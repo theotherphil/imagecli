@@ -42,7 +42,7 @@ cargo run --release -- -v -i images/robin.jpg -o images/5.png -p 'scale 0.4 > DU
 <img src="images/5.png" alt="Output"/>
 
 <pre>
-cargo run --release -- -v -i images/robin.jpg -o images/6.png -p 'scale 0.4 > DUP 3 > gaussian 15.0 > SWAP > gaussian 10.0 > hcat > ROT > gaussian 5.0 > SWAP > hcat > vcat'
+cargo run --release -- -v -i images/robin.jpg -o images/6.png -p 'scale 0.4 > DUP 3 > gaussian 15.0 > ROT 4 > gaussian 10.0 > ROT 3 > gaussian 5.0 > ROT 2 > grid 2 2'
 </pre>
 
 <img src="images/6.png" alt="Output"/>

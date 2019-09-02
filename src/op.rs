@@ -15,7 +15,20 @@ use crate::stack::Stack;
 use std::cmp;
 
 // TODO:
-// - hcat should support an arbitrary number of arguments - either read everything left on the stack or take num_imgs argument
+//  2 x 2 blurred image example becomes far nicer if there's a way of taking a load of one-input, one-output functions
+//  and creating an n-input and n-output function. Then we could write this example as:
+// 
+// ... 'scale 0.4 > DUP 3 > [gaussian 10.0, gaussian 15.0, id, gaussian 5.0] > hcat > SWAP > hcat > vcat'
+// 
+// if we also added a grid function: 
+// 
+// ... 'scale 0.4 > DUP 3 > [id, gaussian 5.0, gaussian 10.0, gaussian 15.0] > grid 2 2'
+//
+// or, with grid but no array support:
+// 
+// ... 'scale 0.4 > DUP 3 > gaussian 15.0 > ROT 4 > gaussian 10.0 > ROT 3 > gaussian 5.0 > ROT 2 > grid 2 2'
+//
+// - add grid cols rows, and either remove hcat and vcat or just make them shorthand for grid 2 1 and grid 1 2
 // - at the end of processing, read images off the stack and write as many as we have output names for
 //      example flows
 //          read two inputs
@@ -28,7 +41,6 @@ use std::cmp;
 // 
 //          read one input 
 //              write red, blue and green channels as separate images
-//  - add vcat
 //  - add constant images
 //  - add ability to add margins
 //  - support user-defined functions over pixels, e.g. map \x -> x * 0.3
@@ -143,6 +155,8 @@ pub enum ImageOp {
     HCat,
     /// Vertically concatenate two images.
     VCat,
+    /// Arrange images into a grid. First argument is the number of columns and second the number of rows.
+    Grid(u32, u32),
 }
 
 impl ImageOp {
@@ -190,6 +204,10 @@ impl ImageOp {
                 let r = stack.pop();
                 vcat(&l, &r)
             },
+            Self::Grid(cols, rows) => {
+                let t = stack.pop_n(*cols as usize * *rows as usize);
+                grid(*cols, *rows, t)
+            }
         };
         stack.push(result);
     }
@@ -207,6 +225,7 @@ impl ImageOp {
             "othresh" => Some(ImageOp::OtsuThreshold),
             "hcat" => Some(ImageOp::HCat),
             "vcat" => Some(ImageOp::VCat),
+            "grid" => Some(ImageOp::Grid(split[1].parse().unwrap(), split[2].parse().unwrap())),
             _ => None,
         }
     }
@@ -242,6 +261,13 @@ fn vcat(top: &DynamicImage, bottom: &DynamicImage) -> DynamicImage {
     out.copy_from(&top, 0, 0);
     out.copy_from(&bottom, 0, top.height());
     ImageRgba8(out)
+}
+
+fn grid(_cols: u32, _rows: u32, images: Vec<DynamicImage>) -> DynamicImage {
+    // TODO: actually implement grid!
+    let top = hcat(&images[0], &images[1]);
+    let bottom = hcat(&images[2], &images[3]);
+    vcat(&top, &bottom)
 }
 
 impl ImageExt for DynamicImage {

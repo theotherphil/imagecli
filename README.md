@@ -77,3 +77,9 @@ cargo run --release -- -v -i images/robin.jpg -o images/12.png -p 'DUP 3 > [red,
 </pre>
 
 <img src="images/12.png" alt="Output"/>
+
+<pre>
+cargo run --release -- -v -i images/robin.jpg -o images/13.png -p 'scale 0.2 > DUP 8 > [scale 1.0, scale 0.9, scale 0.9, scale 0.7, scale 0.6, scale 0.5, scale 0.4, scale 0.3, scale 0.2] > grid 3 3'
+</pre>
+
+<img src="images/13.png" alt="Output"/>

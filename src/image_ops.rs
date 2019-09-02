@@ -17,7 +17,7 @@ pub fn parse(op: &str) -> Option<Box<dyn ImageOp>> {
     if op.starts_with("[") && op.ends_with("]") {
         // TODO: find the method I actually want here when I have internet again
         let ch: Vec<char> = op.chars().skip(1).collect();
-        let ch = &ch[..ch.len() - 2];
+        let ch = &ch[..ch.len() - 1];
         let op: String = ch.iter().collect();
         let split: Vec<&str> = op.split(',').map(|s| s.trim()).collect();
         let mut ops: Vec<Box<dyn ImageOp>> = Vec::new();

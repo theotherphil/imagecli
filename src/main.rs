@@ -13,6 +13,7 @@ use crate::error::Result;
 type ImageStack = stack::Stack<DynamicImage>;
 
 // TODO:
+// - add tests for parsing ops
 // - support different signatures in Array op
 // - write grid properly, and either remove hcat and vcat or just make them shorthand for grid 2 1 and grid 1 2
 //  - add constant images

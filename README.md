@@ -71,3 +71,9 @@ cargo run --release -- -v -i images/robin.jpg -o images/11.png -p 'DUP 2 > blue 
 </pre>
 
 <img src="images/11.png" alt="Output"/>
+
+<pre>
+cargo run --release -- -v -i images/robin.jpg -o images/12.png -p 'DUP 2 > [red, green, blue] > hcat > hcat'
+</pre>
+
+<img src="images/12.png" alt="Output"/>

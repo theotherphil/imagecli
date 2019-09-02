@@ -60,7 +60,6 @@ pub fn parse(op: &str) -> Option<Box<dyn ImageOp>> {
     }
 }
 
-// TODO: use macros here and generate the whole impl
 fn one_in_one_out<F>(stack: &mut ImageStack, f: F)
 where
     F: FnOnce(&DynamicImage) -> DynamicImage

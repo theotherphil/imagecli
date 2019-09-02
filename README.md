@@ -52,3 +52,10 @@ cargo run --release -- -v -i images/robin.jpg images/robin_gray.jpg -o images/7.
 </pre>
 
 <img src="images/7.png" alt="Output"/>
+
+<pre>
+cargo run --release -- -v -i images/robin.jpg images/robin_gray.jpg -o images/8.png images/9.png -p 'scale 0.5 > rotate 10 > SWAP > scale 0.5 > rotate 20 > SWAP'
+</pre>
+
+<img src="images/8.png" alt="Output"/>
+<img src="images/9.png" alt="Output"/>

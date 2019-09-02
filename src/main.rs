@@ -43,20 +43,19 @@ type ImageStack = stack::Stack<DynamicImage>;
 //  - add stages with optional parameters. e.g. rotate uses image centre by default, but user
 //      can specify a centre of rotation if they like
 
-
 #[derive(StructOpt, Debug)]
 struct Opt {
     /// Verbose mode (-v, -vv, -vvv, etc.)
     #[structopt(short, long, parse(from_occurrences))]
     verbose: u8,
 
-    /// Input file
+    /// Input files
     #[structopt(short, long, parse(from_os_str))]
     input: Vec<PathBuf>,
 
-    /// Output file
+    /// Output files
     #[structopt(short, long, parse(from_os_str))]
-    output: PathBuf,
+    output: Vec<PathBuf>,
 
     /// Image processing pipeline to apply
     #[structopt(short, long)]
@@ -77,22 +76,22 @@ fn main() -> Result<()> {
             println!("Input image {:?} (width: {}, height: {})", path, image.width(), image.height());
         }
     }
-    let output = if opt.pipeline.is_some() {
-        let inputs = inputs.into_iter().rev().map(|(_, i)| i).collect(); 
+    let outputs = if opt.pipeline.is_some() {
+        let inputs = inputs.into_iter().map(|(_, i)| i).collect(); 
         run_pipeline(&opt.pipeline.unwrap(), inputs, opt.verbose > 0)
     } else {
-        inputs.first().unwrap().1.clone()
+        inputs.into_iter().map(|(_, i)| i).collect()
     };
-    if verbose {
-        println!("Output image {:?} (width: {}, height: {})", &opt.output, output.width(), output.height());
+    for (path, image) in opt.output.iter().zip(outputs) {
+        if verbose {
+            println!("Output image {:?} (width: {}, height: {})", path, image.width(), image.height());
+        }
+        image.save(path)?;
     }
-    output.save(&opt.output)?;
-
     Ok(())
 }
 
-// TODO: support returning multiple images
-fn run_pipeline(pipeline: &str, inputs: Vec<DynamicImage>, verbose: bool) -> DynamicImage {
+fn run_pipeline(pipeline: &str, inputs: Vec<DynamicImage>, verbose: bool) -> Vec<DynamicImage> {
     // TODO: validation!
     let ops: Vec<Op> = pipeline.split('>').map(|s| s.trim()).map(|s| Op::parse(s).unwrap()).collect();
     let mut stack = ImageStack::new(inputs);
@@ -104,7 +103,7 @@ fn run_pipeline(pipeline: &str, inputs: Vec<DynamicImage>, verbose: bool) -> Dyn
         op.apply(&mut stack);
     }
 
-    stack.pop()
+    stack.contents()
 }
 
 /// A pipeline operation - either a direct manipulation of the stack,

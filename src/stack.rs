@@ -8,9 +8,17 @@ pub struct Stack<T> {
 
 impl<T: Clone> Stack<T> {
     /// Create a stack with the given initial elements.
-    /// The top of the stack is the last item in the provided vector.
+    /// The top of the stack is the first element of the input.
     pub fn new(contents: Vec<T>) -> Self {
+        let contents = contents.into_iter().rev().collect();
         Stack { contents }
+    }
+
+    /// Consume the stack and return its elements.
+    /// The top of the stack is the first element of the output.
+    pub fn contents(self) -> Vec<T> {
+        let contents = self.contents.into_iter().rev().collect();
+        contents
     }
 
     /// duplicates the top element of the stack n times.

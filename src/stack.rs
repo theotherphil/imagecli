@@ -1,6 +1,4 @@
 
-// TODO: Write tests for all Stack functions.
-
 pub struct Stack<T> {
     // The top of the stack is the last element in the vector.
     contents: Vec<T>,
@@ -36,8 +34,7 @@ impl<T: Clone> Stack<T> {
 
     /// drop ( a -- )
     pub fn drop(&mut self) {
-        self.assert_stack_size("drop", 1);
-        self.contents.remove(self.len() - 1);
+        self.pop();
     }
 
     /// rotates the top n elements of the stack.
@@ -88,5 +85,84 @@ impl<T: Clone> Stack<T> {
             "operation {} requires {} elements, but the stack only contains {}",
             op, required, self.len()
         );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_new_contents() {
+        let stack = Stack::new(vec![1, 2, 3]);
+        let contents = stack.contents();
+        assert_eq!(contents, vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn test_pop() {
+        let mut stack = Stack::new(vec![1, 2]);
+        assert_eq!(stack.len(), 2);
+        assert_eq!(stack.pop(), 1);
+        assert_eq!(stack.len(), 1);
+        assert_eq!(stack.pop(), 2);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_pop_empty() {
+        let mut stack = Stack::new(vec![1]);
+        assert_eq!(stack.len(), 1);
+        assert_eq!(stack.pop(), 1);
+        let _ = stack.pop();
+    }
+
+    #[test]
+    fn test_dup() {
+        let mut stack = Stack::new(vec![10, 11]);
+        stack.dup(1);
+        assert_eq!(stack.pop(), 10);
+        assert_eq!(stack.pop(), 10);
+        assert_eq!(stack.pop(), 11);
+        stack.push(12);
+        stack.dup(2);
+        assert_eq!(stack.pop(), 12);
+        assert_eq!(stack.pop(), 12);
+        assert_eq!(stack.pop(), 12);
+        assert_eq!(stack.len(), 0);
+    }
+
+    #[test]
+    fn test_rot() {
+        let mut stack = Stack::new(vec![1, 2, 3]);
+        stack.rot(0);
+        assert_eq!(stack.contents(), vec![1, 2, 3]);
+
+        let mut stack = Stack::new(vec![1, 2, 3]);
+        stack.rot(1);
+        assert_eq!(stack.contents(), vec![1, 2, 3]);
+
+        let mut stack = Stack::new(vec![1, 2, 3]);
+        stack.rot(2);
+        assert_eq!(stack.contents(), vec![2, 1, 3]);
+
+        let mut stack = Stack::new(vec![1, 2, 3]);
+        stack.rot(3);
+        assert_eq!(stack.contents(), vec![2, 3, 1]);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_rot_exceeding_len() {
+        let mut stack = Stack::new(vec![1, 2, 3]);
+        stack.rot(4);
+    }
+
+    #[test]
+    fn test_pop_n() {
+        let mut stack = Stack::new(vec![1, 2, 3]);
+        let top = stack.pop_n(2);
+        assert_eq!(top, vec![1, 2]);
+        assert_eq!(stack.contents(), vec![3]);
     }
 }

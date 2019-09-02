@@ -83,16 +83,29 @@ impl Op {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-pub enum StackOp { Dup, Drop, Swap, Over, Rot }
+pub enum StackOp { Dup(usize), Drop, Over, Rot(usize) }
 
 impl StackOp {
     fn parse(op: &str) -> Option<Self> {
-        match op {
-            "DUP" => Some(StackOp::Dup),
+        let split: Vec<&str> = op.split_whitespace().collect();
+        match split[0] {
+            "DUP" => {
+                if split.len() == 1 {
+                    Some(StackOp::Dup(1))
+                } else {
+                    Some(StackOp::Dup(split[1].parse().unwrap()))
+                }
+            },
             "DROP" => Some(StackOp::Drop),
-            "SWAP" => Some(StackOp::Swap),
             "OVER" => Some(StackOp::Over),
-            "ROT" => Some(StackOp::Rot),
+            "SWAP" => Some(StackOp::Rot(2)),
+            "ROT" => {
+                if split.len() == 1 {
+                    Some(StackOp::Rot(3))
+                } else {
+                    Some(StackOp::Rot(split[1].parse().unwrap()))
+                }
+            },
             _ => None,
         }
     }
@@ -100,11 +113,10 @@ impl StackOp {
     fn apply(&self, stack: &mut ImageStack) {
         // TODO: inline stack function definitions here?
         match self {
-            StackOp::Dup => stack.dup(),
+            StackOp::Dup(n) => stack.dup(*n),
             StackOp::Drop => stack.drop(),
-            StackOp::Swap => stack.swap(),
             StackOp::Over => stack.over(),
-            StackOp::Rot => stack.rot(),
+            StackOp::Rot(n) => stack.rot(*n),
         }
     }
 }

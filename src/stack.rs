@@ -13,10 +13,17 @@ impl<T: Clone> Stack<T> {
         Stack { contents }
     }
 
-    /// dup ( a -- a a )
-    pub fn dup(&mut self) {
+    /// duplicates the top element of the stack n times.
+    ///
+    /// dup 1 (a -- a a)
+    /// dup 2 (a -- a a a)
+    pub fn dup(&mut self, n: usize) {
         self.assert_stack_size("dup", 1);
-        self.contents.push(self.contents[self.len() - 1].clone());
+        // TODO: Remove unnecessary clone
+        let a = self.contents[self.len() - 1].clone();
+        for _ in 0..n {
+            self.contents.push(a.clone());
+        }
     }
 
     /// drop ( a -- )
@@ -25,11 +32,15 @@ impl<T: Clone> Stack<T> {
         self.contents.remove(self.len() - 1);
     }
 
-    /// swap ( a b -- b a )
-    pub fn swap(&mut self) {
-        self.assert_stack_size("swap", 2);
-        let (i, j) = (self.len() - 1, self.len() - 2);
-        self.contents.swap(i, j);
+    /// rotates the top n elements of the stack.
+    /// rot(1) is a no-op, rot(2) swaps the top two elements.
+    pub fn rot(&mut self, n: usize) {
+        if n < 2 { return; }
+        self.assert_stack_size("rot", n);
+        // TODO: Remove unnecessary clone
+        let a = self.contents[self.len() - 1].clone();
+        self.contents.remove(self.contents.len() - 1);
+        self.contents.insert(self.len() - (n - 1), a);
     }
 
     /// over ( a b -- a b a )
@@ -37,14 +48,6 @@ impl<T: Clone> Stack<T> {
         self.assert_stack_size("over", 2);
         let a = self.contents[self.len() - 1].clone();
         self.contents.insert(self.len() - 2, a);
-    }
-
-    /// rot ( a b c -- b c a )
-    pub fn rot(&mut self) {
-        self.assert_stack_size("rot", 3);
-        let a = self.contents[self.len() - 1].clone();
-        self.contents.remove(self.contents.len() - 1);
-        self.contents.insert(self.len() - 3, a);
     }
 
     /// pops the top of the stack.

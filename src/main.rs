@@ -111,14 +111,14 @@ fn run_pipeline(pipeline: &str, inputs: Vec<DynamicImage>, verbose: bool) -> Vec
 #[derive(Debug)]
 pub enum Op {
     StackOp(StackOp),
-    ImageOp(ImageOp),
+    ImageOp(Box<dyn ImageOp>),
 }
 
 impl Op {
     fn parse(op: &str) -> Option<Op> {
         match StackOp::parse(op) {
             Some(o) => Some(Op::StackOp(o)),
-            None => match ImageOp::parse(op) {
+            None => match image_ops::parse(op) {
                 Some(o) => Some(Op::ImageOp(o)),
                 None => None,
             }

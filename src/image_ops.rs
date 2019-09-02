@@ -8,156 +8,72 @@ use std::cmp;
 
 use crate::ImageStack;
 
-/// Image processing operations which read from and write to the image stack.
+/// An image processing operation that operates on a stack of images.
+pub trait ImageOp : std::fmt::Debug {
+    fn apply(&self, stack: &mut ImageStack);
+}
+
+pub fn parse(op: &str) -> Option<Box<dyn ImageOp>> {
+    let split: Vec<&str> = op.split_whitespace().collect();
+    match split[0] {
+        "scale" => Some(Box::new(Scale(split[1].parse().unwrap()))),
+        "gaussian" => Some(Box::new(Gaussian(split[1].parse().unwrap()))),
+        "gray" => Some(Box::new(Gray)),
+        "rotate" => Some(Box::new(Rotate(split[1].parse().unwrap()))),
+        "sobel" => Some(Box::new(Sobel)),
+        "carve" => Some(Box::new(Carve(split[1].parse().unwrap()))),
+        "athresh" => Some(Box::new(AdaptiveThreshold(split[1].parse().unwrap()))),
+        "othresh" => Some(Box::new(OtsuThreshold)),
+        "hcat" => Some(Box::new(HCat)),
+        "vcat" => Some(Box::new(VCat)),
+        "grid" => Some(Box::new(Grid(split[1].parse().unwrap(), split[2].parse().unwrap()))),
+        "median" => Some(Box::new(Median(split[1].parse().unwrap(), split[2].parse().unwrap()))),
+        _ => None,
+    }
+}
+
+fn one_in_one_out<F>(stack: &mut ImageStack, f: F)
+where
+    F: FnOnce(&DynamicImage) -> DynamicImage
+{
+    let image = stack.pop();
+    let result = f(&image);
+    stack.push(result);    
+}
+
+fn two_in_one_out<F>(stack: &mut ImageStack, f: F)
+where
+    F: FnOnce(&DynamicImage, &DynamicImage) -> DynamicImage
+{
+    let left = stack.pop();
+    let right = stack.pop();
+    let result = f(&left, &right);
+    stack.push(result);
+}
+
+/// Scale both width and height by given multiplier.
 #[derive(Debug)]
-pub enum ImageOp {
-    /// Scale both width and height by given multiplier.
-    Scale(f32),
-    /// Apply a Gaussian blur with the given standard deviation.
-    Gaussian(f32),
-    /// Convert to grayscale.
-    Gray,
-    /// Rotate clockwise about the image's center by the given angle in degrees.
-    Rotate(f32),
-    /// Compute image gradients using the Sobel filter.
-    Sobel,
-    /// Apply seam carving to shrink the image to a provided multiple of its original width.
-    Carve(f32),
-    /// Binarise the image using an adaptive thresholding with given block radius.
-    AdaptiveThreshold(u32),
-    /// Binarise the image using Otsu thresholding.
-    OtsuThreshold,
-    /// Horizontally concatenate two images.
-    HCat,
-    /// Vertically concatenate two images.
-    VCat,
-    /// Arrange images into a grid. First argument is the number of columns and second the number of rows.
-    Grid(u32, u32),
-    /// Apply a median filter with the given x radius and y radius.
-    Median(u32, u32),
-}
+struct Scale(f32);
 
-impl ImageOp {
-    pub fn apply(&self, stack: &mut ImageStack) {
-        let result = match self {
-            Self::Scale(s) => {
-                let image = stack.pop();
-                scale(&image, *s)
-            },
-            Self::Gaussian(s) => {
-                let image = stack.pop();
-                gaussian(&image, *s)
-            },
-            Self::Gray => {
-                let image = stack.pop();
-                image.grayscale()
-            },
-            Self::Rotate(t) => {
-                let image = stack.pop();
-                rotate(&image, *t)
-            },
-            Self::Sobel => {
-                let image = stack.pop();
-                sobel(&image)
-            },
-            Self::Carve(r) => {
-                let image = stack.pop();
-                carve(&image, *r)
-            },
-            Self::AdaptiveThreshold(r) => {
-                let image = stack.pop();
-                adaptive_threshold(&image, *r)
-            },
-            Self::OtsuThreshold => {
-                let image = stack.pop();
-                otsu_threshold(&image)
-            },
-            Self::HCat => {
-                let l = stack.pop();
-                let r = stack.pop();
-                hcat(&l, &r)
-            },
-            Self::VCat => {
-                let l = stack.pop();
-                let r = stack.pop();
-                vcat(&l, &r)
-            },
-            Self::Grid(cols, rows) => {
-                let t = stack.pop_n(*cols as usize * *rows as usize);
-                grid(*cols, *rows, t)
-            },
-            Self::Median(x_radius, y_radius) => {
-                let image = stack.pop();
-                median(&image, *x_radius, *y_radius)
-            }
-        };
-        stack.push(result);
-    }
-
-    pub fn parse(op: &str) -> Option<ImageOp> {
-        let split: Vec<&str> = op.split_whitespace().collect();
-        match split[0] {
-            "scale" => Some(ImageOp::Scale(split[1].parse().unwrap())),
-            "gaussian" => Some(ImageOp::Gaussian(split[1].parse().unwrap())),
-            "gray" => Some(ImageOp::Gray),
-            "rotate" => Some(ImageOp::Rotate(split[1].parse().unwrap())),
-            "sobel" => Some(ImageOp::Sobel),
-            "carve" => Some(ImageOp::Carve(split[1].parse().unwrap())),
-            "athresh" => Some(ImageOp::AdaptiveThreshold(split[1].parse().unwrap())),
-            "othresh" => Some(ImageOp::OtsuThreshold),
-            "hcat" => Some(ImageOp::HCat),
-            "vcat" => Some(ImageOp::VCat),
-            "grid" => Some(ImageOp::Grid(split[1].parse().unwrap(), split[2].parse().unwrap())),
-            "median" => Some(ImageOp::Median(split[1].parse().unwrap(), split[2].parse().unwrap())),
-            _ => None,
-        }
-    }
-}
-
-fn hcat(left: &DynamicImage, right: &DynamicImage) -> DynamicImage {
-    // TODO: handle formats properly
-    let left = left.to_rgba();
-    let right = right.to_rgba();
-    let (w, h) = (left.width() + right.width(), cmp::max(left.height(), right.height()));
-    let mut out = image::ImageBuffer::new(w, h);
-    out.copy_from(&left, 0, 0);
-    out.copy_from(&right, left.width(), 0);
-    ImageRgba8(out)
-}
-
-fn vcat(top: &DynamicImage, bottom: &DynamicImage) -> DynamicImage {
-    // TODO: handle formats properly
-    let top = top.to_rgba();
-    let bottom = bottom.to_rgba();
-    let (w, h) = (cmp::max(top.width(), bottom.width()), top.height() + bottom.height());
-    let mut out = image::ImageBuffer::new(w, h);
-    out.copy_from(&top, 0, 0);
-    out.copy_from(&bottom, 0, top.height());
-    ImageRgba8(out)
-}
-
-fn grid(_cols: u32, _rows: u32, images: Vec<DynamicImage>) -> DynamicImage {
-    // TODO: actually implement grid!
-    let top = hcat(&images[0], &images[1]);
-    let bottom = hcat(&images[2], &images[3]);
-    vcat(&top, &bottom)
-}
-
-fn median(image: &DynamicImage, x_radius: u32, y_radius: u32) -> DynamicImage {
-    use imageproc::filter::median_filter;
-    match image {
-        ImageLuma8(image) => ImageLuma8(median_filter(image, x_radius, y_radius)),
-        ImageLumaA8(image) => ImageLumaA8(median_filter(image, x_radius, y_radius)),
-        ImageRgb8(image) => ImageRgb8(median_filter(image, x_radius, y_radius)),
-        ImageRgba8(image) => ImageRgba8(median_filter(image, x_radius, y_radius)),
-        ImageBgr8(image) => ImageBgr8(median_filter(image, x_radius, y_radius)),
-        ImageBgra8(image) => ImageBgra8(median_filter(image, x_radius, y_radius)),
+impl ImageOp for Scale {
+    fn apply(&self, stack: &mut ImageStack) {
+        one_in_one_out(stack, |i| scale(i, self.0));
     }
 }
 
 fn scale(image: &DynamicImage, scale: f32) -> DynamicImage {
     let (w, h) = ((image.width() as f32 * scale) as u32, (image.height() as f32 * scale) as u32);
     image.resize(w, h, image::imageops::FilterType::Lanczos3)
+}
+
+/// Apply a Gaussian blur with the given standard deviation.
+#[derive(Debug)]
+struct Gaussian(f32);
+
+impl ImageOp for Gaussian {
+    fn apply(&self, stack: &mut ImageStack) {
+        one_in_one_out(stack, |i| gaussian(i, self.0));
+    }
 }
 
 fn gaussian(image: &DynamicImage, sigma: f32) -> DynamicImage {
@@ -169,6 +85,26 @@ fn gaussian(image: &DynamicImage, sigma: f32) -> DynamicImage {
         ImageRgba8(image) => ImageRgba8(gaussian_blur_f32(image, sigma)),
         ImageBgr8(image) => ImageBgr8(gaussian_blur_f32(image, sigma)),
         ImageBgra8(image) => ImageBgra8(gaussian_blur_f32(image, sigma)),
+    }
+}
+
+/// Convert to grayscale.
+#[derive(Debug)]
+struct Gray;
+
+impl ImageOp for Gray {
+    fn apply(&self, stack: &mut ImageStack) {
+        one_in_one_out(stack, |i| i.grayscale());
+    }
+}
+
+ /// Rotate clockwise about the image's center by the given angle in degrees.
+#[derive(Debug)]
+struct Rotate(f32);
+
+impl ImageOp for Rotate {
+    fn apply(&self, stack: &mut ImageStack) {
+        one_in_one_out(stack, |i| rotate(i, self.0));
     }
 }
 
@@ -197,6 +133,16 @@ fn rotate(image: &DynamicImage, theta: f32) -> DynamicImage {
     }
 }
 
+/// Compute image gradients using the Sobel filter.
+#[derive(Debug)]
+struct Sobel;
+
+impl ImageOp for Sobel {
+    fn apply(&self, stack: &mut ImageStack) {
+        one_in_one_out(stack, |i| sobel(i));
+    }
+}
+
 fn sobel(image: &DynamicImage) -> DynamicImage {
     use imageproc::gradients::sobel_gradient_map;
     let clamp_to_u8 = |x| { <u8 as Clamp<u16>>::clamp(x) };
@@ -222,6 +168,16 @@ fn sobel(image: &DynamicImage) -> DynamicImage {
     }
 }
 
+/// Apply seam carving to shrink the image to a provided multiple of its original width.
+#[derive(Debug)]
+struct Carve(f32);
+
+impl ImageOp for Carve {
+    fn apply(&self, stack: &mut ImageStack) {
+        one_in_one_out(stack, |i| carve(i, self.0));
+    }
+}
+
 fn carve(image: &DynamicImage, ratio: f32) -> DynamicImage {
     use imageproc::seam_carving::shrink_width;
     assert!(ratio <= 1.0);
@@ -236,13 +192,111 @@ fn carve(image: &DynamicImage, ratio: f32) -> DynamicImage {
     }
 }
 
+/// Binarise the image using an adaptive thresholding with given block radius.
+#[derive(Debug)]
+struct AdaptiveThreshold(u32);
+
+impl ImageOp for AdaptiveThreshold {
+    fn apply(&self, stack: &mut ImageStack) {
+        one_in_one_out(stack, |i| adaptive_threshold(i, self.0));
+    }
+}
+
 fn adaptive_threshold(image: &DynamicImage, block_radius: u32) -> DynamicImage {
     let gray = image.to_luma();
     ImageLuma8(imageproc::contrast::adaptive_threshold(&gray, block_radius))
+}
+
+/// Binarise the image using Otsu thresholding.
+#[derive(Debug)]
+struct OtsuThreshold;
+
+impl ImageOp for OtsuThreshold {
+    fn apply(&self, stack: &mut ImageStack) {
+        one_in_one_out(stack, otsu_threshold);
+    }
 }
 
 fn otsu_threshold(image: &DynamicImage) -> DynamicImage {
     use imageproc::contrast::{otsu_level, threshold};
     let gray = image.to_luma();
     ImageLuma8(threshold(&gray, otsu_level(&gray)))
+}
+
+/// Horizontally concatenate two images.
+#[derive(Debug)]
+struct HCat;
+
+impl ImageOp for HCat {
+    fn apply(&self, stack: &mut ImageStack) {
+        two_in_one_out(stack, |i, j| hcat(i, j));
+    }
+}
+
+fn hcat(left: &DynamicImage, right: &DynamicImage) -> DynamicImage {
+    // TODO: handle formats properly
+    let left = left.to_rgba();
+    let right = right.to_rgba();
+    let (w, h) = (left.width() + right.width(), cmp::max(left.height(), right.height()));
+    let mut out = image::ImageBuffer::new(w, h);
+    out.copy_from(&left, 0, 0);
+    out.copy_from(&right, left.width(), 0);
+    ImageRgba8(out)
+}
+
+/// Vertically concatenate two images.
+#[derive(Debug)]
+struct VCat;
+
+impl ImageOp for VCat {
+    fn apply(&self, stack: &mut ImageStack) {
+        two_in_one_out(stack, |i, j| vcat(i, j));
+    }
+}
+
+fn vcat(top: &DynamicImage, bottom: &DynamicImage) -> DynamicImage {
+    // TODO: handle formats properly
+    let top = top.to_rgba();
+    let bottom = bottom.to_rgba();
+    let (w, h) = (cmp::max(top.width(), bottom.width()), top.height() + bottom.height());
+    let mut out = image::ImageBuffer::new(w, h);
+    out.copy_from(&top, 0, 0);
+    out.copy_from(&bottom, 0, top.height());
+    ImageRgba8(out)
+}
+
+/// Arrange images into a grid. First argument is the number of columns and second the number of rows.
+#[derive(Debug)]
+struct Grid(u32, u32);
+
+impl ImageOp for Grid {
+    fn apply(&self, stack: &mut ImageStack) {
+        // TODO: actually implement grid!
+        let images = stack.pop_n(4);
+        let top = hcat(&images[0], &images[1]);
+        let bottom = hcat(&images[2], &images[3]);
+        stack.push(vcat(&top, &bottom));
+    }
+}
+
+/// Apply a median filter with the given x radius and y radius.
+#[derive(Debug)]
+struct Median(u32, u32);
+
+impl ImageOp for Median {
+    fn apply(&self, stack: &mut ImageStack) {
+        one_in_one_out(stack, |i| median(i, self.0, self.1));
+    }
+}
+
+fn median(image: &DynamicImage, x_radius: u32, y_radius: u32) -> DynamicImage {
+    use imageproc::filter::median_filter;
+    match image {
+        ImageLuma8(image) => ImageLuma8(median_filter(image, x_radius, y_radius)),
+        ImageLumaA8(image) => ImageLumaA8(median_filter(image, x_radius, y_radius)),
+        ImageRgb8(image) => ImageRgb8(median_filter(image, x_radius, y_radius)),
+        ImageRgba8(image) => ImageRgba8(median_filter(image, x_radius, y_radius)),
+        ImageBgr8(image) => ImageBgr8(median_filter(image, x_radius, y_radius)),
+        ImageBgra8(image) => ImageBgra8(median_filter(image, x_radius, y_radius)),
+    }
 }

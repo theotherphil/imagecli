@@ -1,7 +1,7 @@
 
 use image::{
     DynamicImage, DynamicImage::*, GenericImage, GenericImageView,
-    Luma, LumaA, Rgb, Rgba, Bgr, Bgra
+    Luma, LumaA, Rgb, Rgba, Bgr, Bgra, RgbaImage,
 };
 use imageproc::definitions::Clamp;
 use std::cmp;
@@ -40,8 +40,16 @@ pub fn parse(op: &str) -> Option<Box<dyn ImageOp>> {
         "carve" => Some(Box::new(Carve(split[1].parse().unwrap()))),
         "athresh" => Some(Box::new(AdaptiveThreshold(split[1].parse().unwrap()))),
         "othresh" => Some(Box::new(OtsuThreshold)),
-        "hcat" => Some(Box::new(HCat)),
-        "vcat" => Some(Box::new(VCat)),
+        "hcat" => if split.len() == 1 {
+            Some(Box::new(Grid(2, 1)))
+        } else {
+            Some(Box::new(Grid(split[1].parse().unwrap(), 1)))
+        },
+        "vcat" => if split.len() == 1 {
+            Some(Box::new(Grid(1, 2)))
+        } else {
+            Some(Box::new(Grid(1, split[1].parse().unwrap())))
+        },
         "grid" => Some(Box::new(Grid(split[1].parse().unwrap(), split[2].parse().unwrap()))),
         "median" => Some(Box::new(Median(split[1].parse().unwrap(), split[2].parse().unwrap()))),
         "red" => Some(Box::new(Red)),
@@ -59,16 +67,6 @@ where
     let image = stack.pop();
     let result = f(&image);
     stack.push(result);    
-}
-
-fn two_in_one_out<F>(stack: &mut ImageStack, f: F)
-where
-    F: FnOnce(&DynamicImage, &DynamicImage) -> DynamicImage
-{
-    let left = stack.pop();
-    let right = stack.pop();
-    let result = f(&left, &right);
-    stack.push(result);
 }
 
 /// Scale both width and height by given multiplier.
@@ -243,60 +241,56 @@ fn otsu_threshold(image: &DynamicImage) -> DynamicImage {
     ImageLuma8(threshold(&gray, otsu_level(&gray)))
 }
 
-/// Horizontally concatenate two images.
-#[derive(Debug)]
-struct HCat;
-
-impl ImageOp for HCat {
-    fn apply(&self, stack: &mut ImageStack) {
-        two_in_one_out(stack, |i, j| hcat(i, j));
-    }
-}
-
-fn hcat(left: &DynamicImage, right: &DynamicImage) -> DynamicImage {
-    // TODO: handle formats properly
-    let left = left.to_rgba();
-    let right = right.to_rgba();
-    let (w, h) = (left.width() + right.width(), cmp::max(left.height(), right.height()));
-    let mut out = image::ImageBuffer::new(w, h);
-    out.copy_from(&left, 0, 0);
-    out.copy_from(&right, left.width(), 0);
-    ImageRgba8(out)
-}
-
-/// Vertically concatenate two images.
-#[derive(Debug)]
-struct VCat;
-
-impl ImageOp for VCat {
-    fn apply(&self, stack: &mut ImageStack) {
-        two_in_one_out(stack, |i, j| vcat(i, j));
-    }
-}
-
-fn vcat(top: &DynamicImage, bottom: &DynamicImage) -> DynamicImage {
-    // TODO: handle formats properly
-    let top = top.to_rgba();
-    let bottom = bottom.to_rgba();
-    let (w, h) = (cmp::max(top.width(), bottom.width()), top.height() + bottom.height());
-    let mut out = image::ImageBuffer::new(w, h);
-    out.copy_from(&top, 0, 0);
-    out.copy_from(&bottom, 0, top.height());
-    ImageRgba8(out)
-}
-
 /// Arrange images into a grid. First argument is the number of columns and second the number of rows.
 #[derive(Debug)]
 struct Grid(u32, u32);
 
 impl ImageOp for Grid {
     fn apply(&self, stack: &mut ImageStack) {
-        // TODO: actually implement grid!
-        let images = stack.pop_n(4);
-        let top = hcat(&images[0], &images[1]);
-        let bottom = hcat(&images[2], &images[3]);
-        stack.push(vcat(&top, &bottom));
+        let images = stack.pop_n(self.0 as usize * self.1 as usize);
+        let result = grid(&images, self.0, self.1);
+        stack.push(result);
     }
+}
+
+fn grid(images: &[DynamicImage], cols: u32, rows: u32) -> DynamicImage {
+    let (cols, rows) = (cols as usize, rows as usize);
+    assert!(images.len() >= cols * rows);
+    let images = &images[..cols * rows];
+    // TODO: handle formats properly
+    let images: Vec<_> = images.iter().map(|i| i.to_rgba()).collect();
+
+    // Find the widest image in each column and the tallest image in each row
+    let mut widths = Vec::with_capacity(cols);
+    for c in 0..cols {
+        let mut w = 0;
+        for r in 0..rows {
+            w = cmp::max(w, images[r * cols + c].width());
+        }
+        widths.push(w);
+    }
+    let mut heights = Vec::with_capacity(rows);
+    for r in 0..rows {
+        let mut h = 0;
+        for c in 0..cols {
+            h = cmp::max(h, images[r * cols + c].height());
+        }
+        heights.push(h);
+    }
+
+    let lefts: Vec<_> = std::iter::once(0).chain(widths.iter().scan(0, |state, &x| { *state += x; Some(*state) })).collect();
+    let tops: Vec<_> = std::iter::once(0).chain(heights.iter().scan(0, |state, &x| { *state += x; Some(*state) })).collect();
+
+    let mut out = RgbaImage::new(widths.iter().sum(), heights.iter().sum());
+
+    for r in 0..rows {
+        for c in 0..cols {
+            let image = &images[r * cols + c];
+            out.copy_from(image, lefts[c], tops[r]);
+        }
+    }
+
+    ImageRgba8(out)
 }
 
 /// Apply a median filter with the given x radius and y radius.

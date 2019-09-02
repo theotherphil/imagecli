@@ -13,9 +13,8 @@ use crate::error::Result;
 type ImageStack = stack::Stack<DynamicImage>;
 
 // TODO:
-// - add tests for parsing ops
-// - support different signatures in Array op
-// - write grid properly, and either remove hcat and vcat or just make them shorthand for grid 2 1 and grid 1 2
+//  - add tests for parsing ops
+//  - support different signatures in Array op
 //  - add constant images
 //  - add ability to add margins
 //  - support user-defined functions over pixels, e.g. map \x -> x * 0.3
@@ -26,6 +25,7 @@ type ImageStack = stack::Stack<DynamicImage>;
 //      e.g. make -p 'scale 0.4' equivalent to --scale 0.4
 //  - add stages with optional parameters. e.g. rotate uses image centre by default, but user
 //      can specify a centre of rotation if they like
+//  - make performance less atrocious. Don't just clone everything all the time
 
 #[derive(StructOpt, Debug)]
 struct Opt {

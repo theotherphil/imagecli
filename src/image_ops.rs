@@ -14,6 +14,22 @@ pub trait ImageOp : std::fmt::Debug {
 }
 
 pub fn parse(op: &str) -> Option<Box<dyn ImageOp>> {
+    if op.starts_with("[") && op.ends_with("]") {
+        // TODO: find the method I actually want here when I have internet again
+        let ch: Vec<char> = op.chars().skip(1).collect();
+        let ch = &ch[..ch.len() - 2];
+        let op: String = ch.iter().collect();
+        let split: Vec<&str> = op.split(',').map(|s| s.trim()).collect();
+        let mut ops: Vec<Box<dyn ImageOp>> = Vec::new();
+        for s in split {
+            if let Some(o) = parse(s) {
+                ops.push(o);
+            } else {
+                return None;
+            }
+        }
+        return Some(Box::new(Array(ops)));
+    }
     let split: Vec<&str> = op.split_whitespace().collect();
     match split[0] {
         "scale" => Some(Box::new(Scale(split[1].parse().unwrap()))),
@@ -32,6 +48,7 @@ pub fn parse(op: &str) -> Option<Box<dyn ImageOp>> {
     }
 }
 
+// TODO: use macros here and generate the whole impl
 fn one_in_one_out<F>(stack: &mut ImageStack, f: F)
 where
     F: FnOnce(&DynamicImage) -> DynamicImage
@@ -298,5 +315,24 @@ fn median(image: &DynamicImage, x_radius: u32, y_radius: u32) -> DynamicImage {
         ImageRgba8(image) => ImageRgba8(median_filter(image, x_radius, y_radius)),
         ImageBgr8(image) => ImageBgr8(median_filter(image, x_radius, y_radius)),
         ImageBgra8(image) => ImageBgra8(median_filter(image, x_radius, y_radius)),
+    }
+}
+
+/// Applies the nth image operation to the nth element of the stack.
+/// TODO: handle image operations other than one-in-one-out.
+#[derive(Debug)]
+struct Array(Vec<Box<dyn ImageOp>>);
+
+impl ImageOp for Array {
+    fn apply(&self, stack: &mut ImageStack) {
+        let mut results = Vec::new();
+        for op in &self.0 {
+            // TODO: something less egregious
+            op.apply(stack);
+            results.push(stack.pop());
+        }
+        for result in results.into_iter().rev() {
+            stack.push(result);
+        }
     }
 }

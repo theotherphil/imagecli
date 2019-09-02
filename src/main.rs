@@ -13,12 +13,7 @@ use crate::error::Result;
 type ImageStack = stack::Stack<DynamicImage>;
 
 // TODO:
-// - mechanism for taking an array of functions Image^n_i -> Image^m_i and producing a single
-//   function Image^{\Sigma n_i} -> Image^{\Sigma m_i}
-//  
-//  e.g. 2 x 2 grid of blurred images becomes:
-//      ... 'scale 0.4 > DUP 3 > [id, gaussian 5.0, gaussian 10.0, gaussian 15.0] > grid 2 2'
-//
+// - support different signatures in Array op
 // - write grid properly, and either remove hcat and vcat or just make them shorthand for grid 2 1 and grid 1 2
 // - at the end of processing, read images off the stack and write as many as we have output names for
 //      example flows

@@ -59,3 +59,9 @@ cargo run --release -- -v -i images/robin.jpg images/robin_gray.jpg -o images/8.
 
 <img src="images/8.png" alt="Output"/>
 <img src="images/9.png" alt="Output"/>
+
+<pre>
+cargo run --release -- -v -i images/robin.jpg -o images/10.png -p 'scale 0.4 > DUP 3 > [gaussian 1.0, gaussian 3.0, gaussian 5.0, gaussian 7.0] > grid 2 2'
+</pre>
+
+<img src="images/10.png" alt="Output"/>

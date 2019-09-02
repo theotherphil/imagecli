@@ -55,6 +55,7 @@ pub fn parse(op: &str) -> Option<Box<dyn ImageOp>> {
         "red" => Some(Box::new(Red)),
         "green" => Some(Box::new(Green)),
         "blue" => Some(Box::new(Blue)),
+        "id" => Some(Box::new(Id)),
         _ => None,
     }
 }
@@ -380,4 +381,14 @@ fn blue(image: &DynamicImage) -> DynamicImage {
     use imageproc::map::blue_channel;
     let rgb = image.to_rgb();
     ImageLuma8(blue_channel(&rgb))
+}
+
+/// The identity function. Sometimes helpful to make pipelines easier to write.
+#[derive(Debug)]
+struct Id;
+
+impl ImageOp for Id {
+    fn apply(&self, _: &mut ImageStack) {
+        // Do nothing
+    }
 }

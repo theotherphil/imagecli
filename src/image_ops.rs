@@ -33,7 +33,7 @@ pub enum ImageOp {
     VCat,
     /// Arrange images into a grid. First argument is the number of columns and second the number of rows.
     Grid(u32, u32),
-    /// Apply a median filter with the given x radius and y radius
+    /// Apply a median filter with the given x radius and y radius.
     Median(u32, u32),
 }
 

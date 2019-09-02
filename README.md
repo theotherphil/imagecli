@@ -46,3 +46,9 @@ cargo run --release -- -v -i images/robin.jpg -o images/6.png -p 'scale 0.5 > me
 </pre>
 
 <img src="images/6.png" alt="Output"/>
+
+<pre>
+cargo run --release -- -v -i images/robin.jpg images/robin_gray.jpg -o images/7.png -p 'hcat'
+</pre>
+
+<img src="images/7.png" alt="Output"/>

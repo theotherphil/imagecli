@@ -37,6 +37,7 @@ type ImageStack = stack::Stack<DynamicImage>;
 //  - support user-defined functions over pixels, e.g. map \x -> x * 0.3
 //  - add support for everything else relevant from imageproc
 //  - add validation for parsing of individual stages (make them subcommands somehow?)
+//      or use a parser combinatory library, e.g. nom
 //  - add specific subcommands for the pipeline stages?
 //      e.g. make -p 'scale 0.4' equivalent to --scale 0.4
 //  - add stages with optional parameters. e.g. rotate uses image centre by default, but user
@@ -51,7 +52,7 @@ struct Opt {
 
     /// Input file
     #[structopt(short, long, parse(from_os_str))]
-    input: PathBuf,
+    input: Vec<PathBuf>,
 
     /// Output file
     #[structopt(short, long, parse(from_os_str))]
@@ -65,14 +66,22 @@ struct Opt {
 fn main() -> Result<()> {
     let opt = Opt::from_args();
     let verbose = opt.verbose > 0;
-    let input = open(&opt.input)?;
+
+    let inputs: Vec<(&PathBuf, DynamicImage)> = opt.input
+        .iter()
+        .map(|p| (p, open(p).unwrap()))
+        .collect();
+
     if verbose {
-        println!("Input image {:?} (width: {}, height: {})", &opt.input, input.width(), input.height());
+        for (path, image) in &inputs {
+            println!("Input image {:?} (width: {}, height: {})", path, image.width(), image.height());
+        }
     }
     let output = if opt.pipeline.is_some() {
-        run_pipeline(&opt.pipeline.unwrap(), vec![input], opt.verbose > 0)
+        let inputs = inputs.into_iter().rev().map(|(_, i)| i).collect(); 
+        run_pipeline(&opt.pipeline.unwrap(), inputs, opt.verbose > 0)
     } else {
-        input
+        inputs.first().unwrap().1.clone()
     };
     if verbose {
         println!("Output image {:?} (width: {}, height: {})", &opt.output, output.width(), output.height());

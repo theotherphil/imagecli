@@ -7,6 +7,7 @@ mod image_ops;
 use crate::image_ops::ImageOp;
 mod stack_ops;
 use crate::stack_ops::StackOp;
+mod expr;
 mod error;
 use crate::error::Result;
 
@@ -15,6 +16,8 @@ type ImageStack = stack::Stack<DynamicImage>;
 // TODO:
 //  - add tests for parsing ops
 //  - support different signatures in Array op
+//  - example showing changing format of all images in a directory maching some pattern
+//  - flip, thumbnails, crop, allow targeting a fixed size image
 //  - add constant images
 //  - add ability to add margins
 //  - support user-defined functions over pixels, e.g. map \x -> x * 0.3

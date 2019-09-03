@@ -56,7 +56,18 @@ pub fn parse(op: &str) -> Option<Box<dyn ImageOp>> {
         "green" => Some(Box::new(Green)),
         "blue" => Some(Box::new(Blue)),
         "id" => Some(Box::new(Id)),
+        "func" => Some(Box::new(parse_func(op))),
         _ => None,
+    }
+}
+
+// func (x -> x * 2)
+// need to support parsing arithmetic expressions
+fn parse_func(func: &str) -> Func {
+    Func {
+        text: "some fn impl".into(),
+        // TODO: treat the user-provided function as a function from u8 to f64, and then clamp it
+        func: Box::new(|x| x * 2)
     }
 }
 
@@ -389,5 +400,39 @@ struct Id;
 impl ImageOp for Id {
     fn apply(&self, _: &mut ImageStack) {
         // Do nothing
+    }
+}
+
+/// User defined per-subpixel function.
+struct Func {
+    /// The definition provided by the user, to use in logging.
+    text: String,
+    /// The per-subpixel function to apply.
+    func: Box<dyn Fn(u8) -> u8>,
+}
+
+impl std::fmt::Debug for Func {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Func({})", self.text)
+    }
+}
+
+
+impl ImageOp for Func {
+    fn apply(&self, stack: &mut ImageStack) {
+        one_in_one_out(stack, |i| func(i, &self.func));
+    }
+}
+
+fn func(image: &DynamicImage, g: &Box<dyn Fn(u8) -> u8>) -> DynamicImage {
+    use imageproc::map::map_subpixels;
+    let f = |p| { (*g)(p) };
+    match image {
+        ImageLuma8(image) => ImageLuma8(map_subpixels(image, f)),
+        ImageLumaA8(image) => ImageLumaA8(map_subpixels(image, f)),
+        ImageRgb8(image) => ImageRgb8(map_subpixels(image, f)),
+        ImageRgba8(image) => ImageRgba8(map_subpixels(image, f)),
+        ImageBgr8(image) => ImageBgr8(map_subpixels(image, f)),
+        ImageBgra8(image) => ImageBgra8(map_subpixels(image, f)),
     }
 }

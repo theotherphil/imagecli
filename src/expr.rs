@@ -76,7 +76,40 @@ fn tokenise(func: &str) -> Vec<Token> {
 }
 
 #[test]
-fn test_parse_expr_simple() {
+fn test_parse_expr_num() {
+    let tokens = vec![Token::Num(2.0)];
+    let expected = Expr::Num(2.0);
+    let expr = parse_expr(&tokens);
+    assert_eq!(expr, expected);
+}
+
+#[test]
+fn test_parse_expr_var() {
+    let tokens = vec![Token::Var("x".into())];
+    let expected = Expr::Var("x".into());
+    let expr = parse_expr(&tokens);
+    assert_eq!(expr, expected);
+}
+
+#[test]
+fn test_parse_expr_add() {
+    // 3 + 4
+    let tokens = vec![
+        Token::Num(3.0),
+        Token::Plus,
+        Token::Num(4.0),
+    ];
+    let expected = Expr::Binary(
+        ArithmeticOp::Add,
+        Box::new(Expr::Num(3.0)),
+        Box::new(Expr::Num(4.0)),
+    );
+    let expr = parse_expr(&tokens);
+    assert_eq!(expr, expected);
+}
+
+#[test]
+fn test_parse_expr_add_mul() {
     // 3 + 4 * 2
     let tokens = vec![
         Token::Num(3.0),
@@ -85,7 +118,6 @@ fn test_parse_expr_simple() {
         Token::Mul,
         Token::Num(2.0),
     ];
-    let expr = parse_expr(&tokens);
     let expected = Expr::Binary(
         ArithmeticOp::Add,
         Box::new(Expr::Num(3.0)),
@@ -97,6 +129,34 @@ fn test_parse_expr_simple() {
             )
         )
     );
+    let expr = parse_expr(&tokens);
+    assert_eq!(expr, expected);
+}
+
+#[test]
+fn test_parse_expr_add_mul_parens() {
+    // (3 + 4) * 2
+    let tokens = vec![
+        Token::OpenParen,
+        Token::Num(3.0),
+        Token::Plus,
+        Token::Num(4.0),
+        Token::CloseParen,
+        Token::Mul,
+        Token::Num(2.0),
+    ];
+    let expected = Expr::Binary(
+        ArithmeticOp::Mul,
+        Box::new(
+            Expr::Binary(
+                ArithmeticOp::Add,
+                Box::new(Expr::Num(3.0)),
+                Box::new(Expr::Num(4.0))
+            )
+        ),
+        Box::new(Expr::Num(2.0)),
+    );
+    let expr = parse_expr(&tokens);
     assert_eq!(expr, expected);
 }
 
@@ -118,9 +178,39 @@ fn test_parse_expr_complex() {
         Token::Pow,
         Token::Num(2.0),
     ];
-    let expr = parse_expr(&tokens);
+    
     //3 + 4 × 2 ÷ ( 1 − 5 ) ^ 2
-    assert_eq!(expr, Expr::Num(1.0));
+    let expected = Expr::Binary(
+        ArithmeticOp::Add,
+        Box::new(Expr::Num(3.0)),
+        Box::new(
+            Expr::Binary(
+                ArithmeticOp::Div,
+                Box::new(
+                    Expr::Binary(
+                        ArithmeticOp::Mul,
+                        Box::new(Expr::Num(4.0)),
+                        Box::new(Expr::Num(2.0))
+                    )
+                ),
+                Box::new(
+                    Expr::Binary(
+                        ArithmeticOp::Exp,
+                        Box::new(
+                            Expr::Binary(
+                                ArithmeticOp::Sub,
+                                Box::new(Expr::Num(1.0)),
+                                Box::new(Expr::Num(5.0))
+                            )
+                        ),
+                        Box::new(Expr::Num(2.0))
+                    )
+                )
+            )
+        )
+    );
+    let expr = parse_expr(&tokens);
+    assert_eq!(expr, expected);
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

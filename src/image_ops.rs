@@ -605,6 +605,11 @@ where
     out
 }
 
+// TODO: Over-writing with const means you have to do some awkward stack manipulation
+// TODO: if you want to combine the constant image with your inputs.
+// TODO: Maybe it would be better to allow constant images as 'pseudo-inputs', which get
+// TODO: injected at the start of the pipeline, rather than manipulating the existing stack.
+
 /// Create an image with a single constant value.
 #[derive(Debug)]
 struct Const {

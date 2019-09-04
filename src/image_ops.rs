@@ -59,9 +59,59 @@ pub fn parse(op: &str) -> Option<Box<dyn ImageOp>> {
         "blue" => Some(Box::new(Blue)),
         "id" => Some(Box::new(Id)),
         "func" => Some(Box::new(parse_func(op))),
+        "const" => Some(Box::new(parse_const(op))),
         _ => None,
     }
 }
+
+fn parse_const(def: &str) -> Const {
+    let def = &def[6..];
+    // Luma:
+    //  const 100 200 (10)
+    // LumaA:
+    //  const 100 200 (10, 20)
+    // Rgb:
+    //  const 100 200 (50, 90, 100)
+    // Rgba:
+    //  const 100 200 (50, 90, 40, 20)
+    // Bgr and Bgra not supported
+    // TODO: parse operations like a sensible person would
+    let split: Vec<&str> = def.split('(').collect();
+    let dims: Vec<u32> = split[0].split_whitespace().map(|d| d.parse::<u32>().unwrap()).collect();
+    let vals: Vec<u8> = split[1][..split[1].len() - 1].split(',').map(|v| v.trim()).map(|v| v.parse::<u8>().unwrap()).collect();
+
+    let color = match vals.len() {
+        1 => Color::Luma(Luma([vals[0]])),
+        2 => Color::LumaA(LumaA([vals[0], vals[1]])),
+        3 => Color::Rgb(Rgb([vals[0], vals[1], vals[2]])),
+        4 => Color::Rgba(Rgba([vals[0], vals[1], vals[2], vals[3]])),
+        _ => panic!("Invalid color"),
+    };
+
+    Const {
+        width: dims[0],
+        height: dims[1],
+        color
+    }
+}
+
+// /// Create an image with a single constant value.
+// #[derive(Debug)]
+// struct Const {
+//     width: u32,
+//     height: u32,
+//     color: Color,
+// }
+
+// #[derive(Debug, Clone)]
+// enum Color {
+//     Luma(Luma<u8>),
+//     LumaA(LumaA<u8>),
+//     Rgb(Rgb<u8>),
+//     Rgba(Rgba<u8>),
+//     Bgr(Bgr<u8>),
+//     Bgra(Bgra<u8>),
+// }
 
 fn parse_func(func: &str) -> Func {
     Func {
@@ -473,4 +523,39 @@ where
     }
 
     out
+}
+
+/// Create an image with a single constant value.
+#[derive(Debug)]
+struct Const {
+    width: u32,
+    height: u32,
+    color: Color,
+}
+
+#[derive(Debug, Clone)]
+enum Color {
+    Luma(Luma<u8>),
+    LumaA(LumaA<u8>),
+    Rgb(Rgb<u8>),
+    Rgba(Rgba<u8>),
+    Bgr(Bgr<u8>),
+    Bgra(Bgra<u8>),
+}
+
+impl ImageOp for Const {
+    fn apply(&self, stack: &mut ImageStack) {
+        one_in_one_out(stack, |_| constant(self));
+    }
+}
+
+fn constant(c: &Const) -> DynamicImage {
+    match c.color {
+        Color::Luma(l) => ImageLuma8(ImageBuffer::from_pixel(c.width, c.height, l)),
+        Color::LumaA(l) => ImageLumaA8(ImageBuffer::from_pixel(c.width, c.height, l)),
+        Color::Rgb(l) => ImageRgb8(ImageBuffer::from_pixel(c.width, c.height, l)),
+        Color::Rgba(l) => ImageRgba8(ImageBuffer::from_pixel(c.width, c.height, l)),
+        Color::Bgr(l) => ImageBgr8(ImageBuffer::from_pixel(c.width, c.height, l)),
+        Color::Bgra(l) => ImageBgra8(ImageBuffer::from_pixel(c.width, c.height, l)),
+    }
 }

@@ -89,3 +89,9 @@ cargo run --release -- -v -i images/robin_small.png -o images/14.png -p 'func (p
 </pre>
 
 <img src="images/14.png" alt="Output"/>
+
+<pre>
+cargo run --release -- -v -i images/robin_small.png -o images/15.png -p 'const 300 250 (255, 255, 0)'
+</pre>
+
+<img src="images/15.png" alt="Output"/>

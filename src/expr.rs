@@ -293,6 +293,7 @@ mod tests {
     macro_rules! div { ($left:expr, $right:expr) => {  op!(ArithmeticOp::Div, $left, $right) } }
     macro_rules! exp { ($left:expr, $right:expr) => {  op!(ArithmeticOp::Exp, $left, $right) } }
     macro_rules! num { ($num:expr) => { Expr::Num($num) } }
+    macro_rules! var { ($var:expr) => { Expr::Var($var.into()) } }
 
     // Macro to make it less verbose to list Tokens in tests
     macro_rules! tokens {
@@ -328,8 +329,8 @@ mod tests {
 
     #[test]
     fn test_parse_expr_num() {
-        let tokens = vec![Token::Num(2.0)];
-        let expected = Expr::Num(2.0);
+        let tokens = tokens!["2"];
+        let expected = num!(2.0);
         let expr = parse_expr(&tokens);
         assert_eq!(expr, expected);
     }
@@ -337,7 +338,7 @@ mod tests {
     #[test]
     fn test_parse_expr_var() {
         let tokens = vec![Token::Var("x".into())];
-        let expected = Expr::Var("x".into());
+        let expected = var!("x");
         let expr = parse_expr(&tokens);
         assert_eq!(expr, expected);
     }
@@ -374,6 +375,15 @@ mod tests {
         // 4 x 2 / 5
         let tokens = tokens!["4", "*", "2", "/", "5"];
         let expected = div!(mul!(num!(4.0), num!(2.0)), num!(5.0));
+        let expr = parse_expr(&tokens);
+        assert_eq!(expr, expected);
+    }
+
+    #[test]
+    fn test_parse_expr_multiple_vars() {
+        // p + x / 10 + y / 10
+        let tokens = tokens!["p", "+", "x", "/", "10", "+", "y", "/", "10"];
+        let expected = add!(add!(var!("p"), div!(var!("x"), num!(10.0))), div!(var!("y"), num!(10.0)));
         let expr = parse_expr(&tokens);
         assert_eq!(expr, expected);
     }

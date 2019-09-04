@@ -423,20 +423,54 @@ impl ImageOp for Func {
 }
 
 fn func(image: &DynamicImage, expr: &Expr) -> DynamicImage {
-    use imageproc::map::map_subpixels;
-    let f = |p| {
-        // TODO: don't allocate a new HashMap for every subpixel!!
+    let f = |p, x, y| {
+        // TODO: don't allocate a new HashMap and three strings for every subpixel!!
         let mut vars = HashMap::new();
-        vars.insert("x".into(), p as f32);
-        let y = expr.evaluate(&vars);
-        <u8 as Clamp<f32>>::clamp(y)
+        vars.insert("p".into(), p as f32);
+        vars.insert("x".into(), x as f32);
+        vars.insert("y".into(), y as f32);
+        let r = expr.evaluate(&vars);
+        <u8 as Clamp<f32>>::clamp(r)
     };
     match image {
-        ImageLuma8(image) => ImageLuma8(map_subpixels(image, f)),
-        ImageLumaA8(image) => ImageLumaA8(map_subpixels(image, f)),
-        ImageRgb8(image) => ImageRgb8(map_subpixels(image, f)),
-        ImageRgba8(image) => ImageRgba8(map_subpixels(image, f)),
-        ImageBgr8(image) => ImageBgr8(map_subpixels(image, f)),
-        ImageBgra8(image) => ImageBgra8(map_subpixels(image, f)),
+        ImageLuma8(image) => ImageLuma8(map_subpixels_with_coords(image, f)),
+        ImageLumaA8(image) => ImageLumaA8(map_subpixels_with_coords(image, f)),
+        ImageRgb8(image) => ImageRgb8(map_subpixels_with_coords(image, f)),
+        ImageRgba8(image) => ImageRgba8(map_subpixels_with_coords(image, f)),
+        ImageBgr8(image) => ImageBgr8(map_subpixels_with_coords(image, f)),
+        ImageBgra8(image) => ImageBgra8(map_subpixels_with_coords(image, f)),
     }
+}
+
+use imageproc::{definitions::Image, map::{ChannelMap, WithChannel}};
+use image::{ImageBuffer, Pixel, Primitive};
+
+// Could add this to imageproc, but either way we should extend the syntax for custom functions
+// to support user-provided functions on entire pixels rather than just per channel.
+#[allow(deprecated)]
+fn map_subpixels_with_coords<I, P, F, S>(image: &I, f: F) -> Image<ChannelMap<P, S>>
+where
+    I: GenericImage<Pixel = P>,
+    P: WithChannel<S> + 'static,
+    S: Primitive + 'static,
+    F: Fn(P::Subpixel, u32, u32) -> S,
+{
+    let (width, height) = image.dimensions();
+    let mut out: ImageBuffer<ChannelMap<P, S>, Vec<S>> = ImageBuffer::new(width, height);
+
+    for y in 0..height {
+        for x in 0..width {
+            let out_channels = out.get_pixel_mut(x, y).channels_mut();
+            for c in 0..P::channel_count() {
+                out_channels[c as usize] = f(unsafe {
+                    *image
+                        .unsafe_get_pixel(x, y)
+                        .channels()
+                        .get_unchecked(c as usize)
+                }, x, y);
+            }
+        }
+    }
+
+    out
 }

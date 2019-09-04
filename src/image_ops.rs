@@ -57,6 +57,7 @@ pub fn parse(op: &str) -> Option<Box<dyn ImageOp>> {
         "blue" => Some(Box::new(Blue)),
         "id" => Some(Box::new(Id)),
         "func" => Some(Box::new(parse_func(op))),
+        "func2" => Some(Box::new(parse_func2(op))),
         "const" => Some(Box::new(parse_const(op))),
         "circle" => Some(Box::new(parse_circle(op))),
         _ => None,
@@ -118,6 +119,13 @@ fn parse_func(func: &str) -> Func {
     Func {
         text: func.into(),
         expr: crate::expr::parse_func(&func[5..]),
+    }
+}
+
+fn parse_func2(func: &str) -> Func2 {
+    Func2 {
+        text: func.into(),
+        expr: crate::expr::parse_func(&func[6..]),
     }
 }
 
@@ -475,7 +483,7 @@ impl ImageOp for Func {
 
 fn func(image: &DynamicImage, expr: &Expr) -> DynamicImage {
     let f = |p, x, y| {
-        let r = expr.evaluate(x as f32, y as f32, p as f32);
+        let r = expr.evaluate(x as f32, y as f32, p as f32, 0.0);
         <u8 as Clamp<f32>>::clamp(r)
     };
     match image {
@@ -486,6 +494,43 @@ fn func(image: &DynamicImage, expr: &Expr) -> DynamicImage {
         ImageBgr8(image) => ImageBgr8(map_subpixels_with_coords(image, f)),
         ImageBgra8(image) => ImageBgra8(map_subpixels_with_coords(image, f)),
     }
+}
+
+
+/// User defined per-subpixel function, taking two input images.
+struct Func2 {
+    /// The definition provided by the user, to use in logging.
+    text: String,
+    /// The expression to evalute per-subpixel.
+    expr: Expr,
+}
+
+impl std::fmt::Debug for Func2 {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Func2({})", self.text)
+    }
+}
+
+impl ImageOp for Func2 {
+    fn apply(&self, stack: &mut ImageStack) {
+        let image1 = stack.pop();
+        let image2 = stack.pop();
+        let result = func2(&image1, &image2, &self.expr);
+        stack.push(result);
+    }
+}
+
+fn func2(image1: &DynamicImage, image2: &DynamicImage, expr: &Expr) -> DynamicImage {
+    let f = |p, q, x, y| {
+        let r = expr.evaluate(x as f32, y as f32, p as f32, q as f32);
+        <u8 as Clamp<f32>>::clamp(r)
+    };
+    // TODO: don't do unnecessary conversions everywhere. Rather than constantly converting
+    // TODO: between formats or adding elaborate format checking, maybe we should just do all
+    // TODO: calculations at RGBA.
+    let image1 = image1.to_rgba();
+    let image2 = image2.to_rgba();
+    ImageRgba8(map_subpixels_with_coords2(&image1, &image2, f))
 }
 
 use imageproc::{definitions::Image, map::{ChannelMap, WithChannel}};
@@ -514,6 +559,45 @@ where
                         .channels()
                         .get_unchecked(c as usize)
                 }, x, y);
+            }
+        }
+    }
+
+    out
+}
+
+#[allow(deprecated)]
+fn map_subpixels_with_coords2<I, P, S, F>(image1: &I, image2: &I, f: F) -> Image<ChannelMap<P, S>>
+where
+    I: GenericImage<Pixel = P>,
+    P: WithChannel<S> + 'static,
+    S: Primitive + 'static,
+    P::Subpixel: std::fmt::Debug,
+    F: Fn(P::Subpixel, P::Subpixel, u32, u32) -> S,
+{
+    // TODO: allow differently sized images, do sensible format conversions when the two images have different formats
+    assert_eq!(image1.dimensions(), image2.dimensions());
+
+    let (width, height) = image1.dimensions();
+    let mut out: ImageBuffer<ChannelMap<P, S>, Vec<S>> = ImageBuffer::new(width, height);
+
+    for y in 0..height {
+        for x in 0..width {
+            let out_channels = out.get_pixel_mut(x, y).channels_mut();
+            for c in 0..P::channel_count() {
+                let p = unsafe {
+                    *image1
+                        .unsafe_get_pixel(x, y)
+                        .channels()
+                        .get_unchecked(c as usize)
+                };
+                let q = unsafe {
+                    *image2
+                        .unsafe_get_pixel(x, y)
+                        .channels()
+                        .get_unchecked(c as usize)
+                };
+                out_channels[c as usize] = f(p, q, x, y);
             }
         }
     }

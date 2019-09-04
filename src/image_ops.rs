@@ -474,12 +474,7 @@ impl ImageOp for Func {
 
 fn func(image: &DynamicImage, expr: &Expr) -> DynamicImage {
     let f = |p, x, y| {
-        // TODO: don't allocate a new HashMap and three strings for every subpixel!!
-        let mut vars = HashMap::new();
-        vars.insert("p".into(), p as f32);
-        vars.insert("x".into(), x as f32);
-        vars.insert("y".into(), y as f32);
-        let r = expr.evaluate(&vars);
+        let r = expr.evaluate(x as f32, y as f32, p as f32);
         <u8 as Clamp<f32>>::clamp(r)
     };
     match image {

@@ -17,16 +17,21 @@ pub enum Expr {
 }
 
 impl Expr {
-    pub fn evaluate(&self, vars: &HashMap<String, f32>) -> f32 {
+    pub fn evaluate(&self, x: f32, y: f32, p: f32) -> f32 {
         match self {
             Expr::Num(n) => *n,
-            Expr::Var(s) => vars[s],
+            Expr::Var(s) => match s.as_ref() {
+                "x" => x,
+                "y" => y,
+                "p" => p,
+                _ => panic!("Invalid variable"),
+            },
             Expr::Binary(op, left, right) => match op {
-                ArithmeticOp::Add => left.evaluate(vars) + right.evaluate(vars),
-                ArithmeticOp::Sub => left.evaluate(vars) - right.evaluate(vars),
-                ArithmeticOp::Mul => left.evaluate(vars) * right.evaluate(vars),
-                ArithmeticOp::Div => left.evaluate(vars) / right.evaluate(vars),
-                ArithmeticOp::Exp => left.evaluate(vars).powf(right.evaluate(vars)),
+                ArithmeticOp::Add => left.evaluate(x, y, p) + right.evaluate(x, y, p),
+                ArithmeticOp::Sub => left.evaluate(x, y, p) - right.evaluate(x, y, p),
+                ArithmeticOp::Mul => left.evaluate(x, y, p) * right.evaluate(x, y, p),
+                ArithmeticOp::Div => left.evaluate(x, y, p) / right.evaluate(x, y, p),
+                ArithmeticOp::Exp => left.evaluate(x, y, p).powf(right.evaluate(x, y, p)),
             }
         }
     }

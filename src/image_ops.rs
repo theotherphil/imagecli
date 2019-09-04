@@ -6,8 +6,6 @@ use image::{
 use imageproc::definitions::Clamp;
 use crate::expr::Expr;
 use std::cmp;
-use std::collections::HashMap;
-
 use crate::ImageStack;
 
 /// An image processing operation that operates on a stack of images.
@@ -60,7 +58,35 @@ pub fn parse(op: &str) -> Option<Box<dyn ImageOp>> {
         "id" => Some(Box::new(Id)),
         "func" => Some(Box::new(parse_func(op))),
         "const" => Some(Box::new(parse_const(op))),
+        "circle" => Some(Box::new(parse_circle(op))),
         _ => None,
+    }
+}
+
+fn parse_circle(def: &str) -> Circle {
+    // TODO: support drawing a centred circle without the caller having to specify the centre.
+    // TODO: need a sensible standardised format for drawing functions.
+    let def = &def[7..];
+    let split: Vec<&str> = def.split_whitespace().collect();
+    let fill = match split[0].to_lowercase().as_str() {
+        "filled" => FillType::Filled,
+        "hollow" => FillType::Hollow,
+        _ => panic!("Invalid fill type"),
+    };
+    let center = (split[1].parse::<i32>().unwrap(), split[2].parse::<i32>().unwrap());
+    let radius = split[3].parse::<i32>().unwrap();
+    let vals: Vec<u8> = split[4..split.len()].iter().map(|v| v.trim()).map(|v| v.parse::<u8>().unwrap()).collect();
+    let color = color_from_vals(&vals);
+    Circle { fill, center, radius, color }
+}
+
+fn color_from_vals(vals: &[u8]) -> Color {
+    match vals.len() {
+        1 => Color::Luma(Luma([vals[0]])),
+        2 => Color::LumaA(LumaA([vals[0], vals[1]])),
+        3 => Color::Rgb(Rgb([vals[0], vals[1], vals[2]])),
+        4 => Color::Rgba(Rgba([vals[0], vals[1], vals[2], vals[3]])),
+        _ => panic!("Invalid color"),
     }
 }
 
@@ -79,14 +105,7 @@ fn parse_const(def: &str) -> Const {
     let split: Vec<&str> = def.split('(').collect();
     let dims: Vec<u32> = split[0].split_whitespace().map(|d| d.parse::<u32>().unwrap()).collect();
     let vals: Vec<u8> = split[1][..split[1].len() - 1].split(',').map(|v| v.trim()).map(|v| v.parse::<u8>().unwrap()).collect();
-
-    let color = match vals.len() {
-        1 => Color::Luma(Luma([vals[0]])),
-        2 => Color::LumaA(LumaA([vals[0], vals[1]])),
-        3 => Color::Rgb(Rgb([vals[0], vals[1], vals[2]])),
-        4 => Color::Rgba(Rgba([vals[0], vals[1], vals[2], vals[3]])),
-        _ => panic!("Invalid color"),
-    };
+    let color = color_from_vals(&vals);
 
     Const {
         width: dims[0],
@@ -94,24 +113,6 @@ fn parse_const(def: &str) -> Const {
         color
     }
 }
-
-// /// Create an image with a single constant value.
-// #[derive(Debug)]
-// struct Const {
-//     width: u32,
-//     height: u32,
-//     color: Color,
-// }
-
-// #[derive(Debug, Clone)]
-// enum Color {
-//     Luma(Luma<u8>),
-//     LumaA(LumaA<u8>),
-//     Rgb(Rgb<u8>),
-//     Rgba(Rgba<u8>),
-//     Bgr(Bgr<u8>),
-//     Bgra(Bgra<u8>),
-// }
 
 fn parse_func(func: &str) -> Func {
     Func {
@@ -528,6 +529,11 @@ struct Const {
     color: Color,
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+enum ColorSpace {
+    Luma, LumaA, Rgb, Rgba, Bgr, Bgra
+}
+
 #[derive(Debug, Clone)]
 enum Color {
     Luma(Luma<u8>),
@@ -536,6 +542,30 @@ enum Color {
     Rgba(Rgba<u8>),
     Bgr(Bgr<u8>),
     Bgra(Bgra<u8>),
+}
+
+impl Color {
+    fn color_space(&self) -> ColorSpace {
+        match self {
+            Color::Luma(_) => ColorSpace::Luma,
+            Color::LumaA(_) => ColorSpace::LumaA,
+            Color::Rgb(_) => ColorSpace::Rgb,
+            Color::Rgba(_) => ColorSpace::Rgba,
+            Color::Bgr(_) => ColorSpace::Bgr,
+            Color::Bgra(_) => ColorSpace::Bgra,
+        }
+    }
+}
+
+fn color_space(image: &DynamicImage) -> ColorSpace {
+    match image {
+        ImageLuma8(_) => ColorSpace::Luma,
+        ImageLumaA8(_) => ColorSpace::LumaA,
+        ImageRgb8(_) => ColorSpace::Rgb,
+        ImageRgba8(_) => ColorSpace::Rgba,
+        ImageBgr8(_) => ColorSpace::Bgr,
+        ImageBgra8(_) => ColorSpace::Bgra,
+    }
 }
 
 impl ImageOp for Const {
@@ -552,5 +582,45 @@ fn constant(c: &Const) -> DynamicImage {
         Color::Rgba(l) => ImageRgba8(ImageBuffer::from_pixel(c.width, c.height, l)),
         Color::Bgr(l) => ImageBgr8(ImageBuffer::from_pixel(c.width, c.height, l)),
         Color::Bgra(l) => ImageBgra8(ImageBuffer::from_pixel(c.width, c.height, l)),
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+enum FillType { Filled, Hollow }
+
+/// Draw a circle with the given center, radius, color, and fill type.
+#[derive(Debug)]
+struct Circle {
+    fill: FillType,
+    center: (i32, i32),
+    radius: i32,
+    color: Color,
+}
+
+impl ImageOp for Circle {
+    fn apply(&self, stack: &mut ImageStack) {
+        one_in_one_out(stack, |i| draw_circle(i, self));
+    }
+}
+
+// TODO: if we always pass the op type itself then we can standardise the calls to one_in_one_out across all ops.
+fn draw_circle(image: &DynamicImage, circle: &Circle) -> DynamicImage {
+    use imageproc::drawing::{draw_hollow_circle, draw_filled_circle};
+    // TODO: Handle formats properly - choose the "most general" color space.
+    let image = image.to_rgba();
+    let color = match circle.color {
+        Color::Luma(c) => c.to_rgba(),
+        Color::LumaA(c) => c.to_rgba(),
+        Color::Rgb(c) => c.to_rgba(),
+        Color::Rgba(c) => c.to_rgba(),
+        Color::Bgr(c) => c.to_rgba(),
+        Color::Bgra(c) => c.to_rgba(),
+    };
+
+    // TODO: We always consume entries from the stack, so we using mutating functions where
+    // TODO: possible, rather than just constantly allocating new images.
+    match circle.fill {
+        FillType::Filled => ImageRgba8(draw_filled_circle(&image, circle.center, circle.radius, color)),
+        FillType::Hollow => ImageRgba8(draw_hollow_circle(&image, circle.center, circle.radius, color)),
     }
 }

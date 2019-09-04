@@ -1,6 +1,4 @@
 
-use std::collections::HashMap;
-
 pub fn parse_func(body: &str) -> Expr {
     let tokens = tokenise(body);
     parse_expr(&tokens)

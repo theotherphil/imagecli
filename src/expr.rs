@@ -49,24 +49,99 @@ enum Token {
     CloseParen,
 }
 
+struct Lexer {
+    text: Vec<char>,
+    position: usize,
+}
+
+impl Lexer {
+    fn new(text: &str) -> Self {
+        Lexer {
+            text: text.chars().collect(),
+            position: 0,
+        }
+    }
+
+    fn current(&self) -> Option<char> {
+        if self.position == self.text.len() {
+            None
+        } else {
+            Some(self.text[self.position])
+        }
+    }
+}
+
+fn is_op_or_paren(c: char) -> bool {
+    match c {
+        '+' | '-' | '*' | '/' | '^' | '(' | ')' => true,
+        _ => false
+    }
+}
+
+impl Iterator for Lexer {
+    type Item = Token;
+
+    fn next(&mut self) -> Option<Token> {
+        while self.current().is_some() && self.current().unwrap().is_whitespace() {
+            self.position += 1;
+        }
+        if self.current().is_none() {
+            return None;
+        }
+        let current = self.current().unwrap();
+        if current == '(' {
+            self.position += 1;
+            return Some(Token::OpenParen);
+        }
+        if current == ')' {
+            self.position += 1;
+            return Some(Token::CloseParen);
+        }
+        if current == '+' {
+            self.position += 1;
+            return Some(Token::Plus);
+        }
+        if current == '-' {
+            self.position += 1;
+            return Some(Token::Sub);
+        }
+        if current == '*' {
+            self.position += 1;
+            return Some(Token::Mul);
+        }
+        if current == '/' {
+            self.position += 1;
+            return Some(Token::Div);
+        }
+        if current == '^' {
+            self.position += 1;
+            return Some(Token::Pow);
+        }
+        // TODO: handle named functions
+        if current.is_alphabetic() {
+            let mut var = vec![];
+            while self.current().is_some() && self.current().unwrap().is_alphabetic() {
+                var.push(self.current().unwrap());
+                self.position += 1;
+            }
+            return Some(Token::Var(var.iter().collect()))
+        }
+        let mut num = vec![];
+        while self.current().is_some()
+            && !self.current().unwrap().is_whitespace()
+            && !is_op_or_paren(self.current().unwrap())
+        {
+            num.push(self.current().unwrap());
+            self.position += 1;
+        }
+        let num: String = num.iter().collect();
+        Some(Token::Num(num.parse().unwrap()))
+    }
+}
+
 fn tokenise(func: &str) -> Vec<Token> {
-    // TODO: actually tokenise!
-    //3 + 4 × 2 ÷ ( 1 − 5 ) ^ 2
-    vec![
-        Token::Num(3.0),
-        Token::Plus,
-        Token::Num(4.0),
-        Token::Mul,
-        Token::Num(2.0),
-        Token::Div,
-        Token::OpenParen,
-        Token::Num(1.0),
-        Token::Sub,
-        Token::Num(5.0),
-        Token::CloseParen,
-        Token::Pow,
-        Token::Num(2.0),
-    ]
+    let lexer = Lexer::new(func);
+    lexer.collect()
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -240,6 +315,15 @@ mod tests {
             "^" => Token::Pow,
             _ => Token::Var(t.into())
         }
+    }
+
+    #[test]
+    fn test_tokenise() {
+        let text = "3 + 4 * 2 / (1 - 5) ^ 2";
+        assert_eq!(
+            tokenise(text),
+            tokens!["3", "+", "4", "*", "2", "/", "(", "1", "-", "5", ")", "^", "2"]
+        );
     }
 
     #[test]

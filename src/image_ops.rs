@@ -4,7 +4,9 @@ use image::{
     Luma, LumaA, Rgb, Rgba, Bgr, Bgra, RgbaImage,
 };
 use imageproc::definitions::Clamp;
+use crate::expr::Expr;
 use std::cmp;
+use std::collections::HashMap;
 
 use crate::ImageStack;
 
@@ -61,13 +63,10 @@ pub fn parse(op: &str) -> Option<Box<dyn ImageOp>> {
     }
 }
 
-// func (x -> x * 2)
-// need to support parsing arithmetic expressions
 fn parse_func(func: &str) -> Func {
     Func {
-        text: "some fn impl".into(),
-        // TODO: treat the user-provided function as a function from u8 to f64, and then clamp it
-        func: Box::new(|x| x * 2)
+        text: func.into(),
+        expr: crate::expr::parse_func(&func[5..]),
     }
 }
 
@@ -407,8 +406,8 @@ impl ImageOp for Id {
 struct Func {
     /// The definition provided by the user, to use in logging.
     text: String,
-    /// The per-subpixel function to apply.
-    func: Box<dyn Fn(u8) -> u8>,
+    /// The expression to evalute per-subpixel.
+    expr: Expr,
 }
 
 impl std::fmt::Debug for Func {
@@ -417,16 +416,21 @@ impl std::fmt::Debug for Func {
     }
 }
 
-
 impl ImageOp for Func {
     fn apply(&self, stack: &mut ImageStack) {
-        one_in_one_out(stack, |i| func(i, &self.func));
+        one_in_one_out(stack, |i| func(i, &self.expr));
     }
 }
 
-fn func(image: &DynamicImage, g: &Box<dyn Fn(u8) -> u8>) -> DynamicImage {
+fn func(image: &DynamicImage, expr: &Expr) -> DynamicImage {
     use imageproc::map::map_subpixels;
-    let f = |p| { (*g)(p) };
+    let f = |p| {
+        // TODO: don't allocate a new HashMap for every subpixel!!
+        let mut vars = HashMap::new();
+        vars.insert("x".into(), p as f32);
+        let y = expr.evaluate(&vars);
+        <u8 as Clamp<f32>>::clamp(y)
+    };
     match image {
         ImageLuma8(image) => ImageLuma8(map_subpixels(image, f)),
         ImageLumaA8(image) => ImageLumaA8(map_subpixels(image, f)),

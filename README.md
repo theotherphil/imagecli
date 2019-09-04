@@ -85,7 +85,7 @@ cargo run --release -- -v -i images/robin.jpg -o images/13.png -p 'scale 0.2 > D
 <img src="images/13.png" alt="Output"/>
 
 <pre>
-cargo run --release -- -v -i images/robin_small.png -o images/14.png -p 'func (x + 10)'
+cargo run --release -- -v -i images/robin_small.png -o images/14.png -p 'func (x + 40)'
 </pre>
 
 <img src="images/14.png" alt="Output"/>

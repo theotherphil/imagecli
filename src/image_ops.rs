@@ -60,6 +60,7 @@ pub fn parse(op: &str) -> Option<Box<dyn ImageOp>> {
         "func2" => Some(Box::new(parse_func2(op))),
         "const" => Some(Box::new(parse_const(op))),
         "circle" => Some(Box::new(parse_circle(op))),
+        "translate" => Some(Box::new(Translate(split[1].parse().unwrap(), split[2].parse().unwrap()))),
         _ => None,
     }
 }
@@ -711,5 +712,28 @@ fn draw_circle(image: &DynamicImage, circle: &Circle) -> DynamicImage {
     match circle.fill {
         FillType::Filled => ImageRgba8(draw_filled_circle(&image, circle.center, circle.radius, color)),
         FillType::Hollow => ImageRgba8(draw_hollow_circle(&image, circle.center, circle.radius, color)),
+    }
+}
+
+/// Translate the image.
+#[derive(Debug)]
+struct Translate(i32, i32);
+
+impl ImageOp for Translate {
+    fn apply(&self, stack: &mut ImageStack) {
+        one_in_one_out(stack, |i| translate(i, self.0, self.1));
+    }
+}
+
+fn translate(image: &DynamicImage, tx: i32, ty: i32) -> DynamicImage {
+    use imageproc::geometric_transformations::translate;
+    let t = (tx, ty);
+    match image {
+        ImageLuma8(image) => ImageLuma8(translate(image, t)),
+        ImageLumaA8(image) => ImageLumaA8(translate(image, t)),
+        ImageRgb8(image) => ImageRgb8(translate(image, t)),
+        ImageRgba8(image) => ImageRgba8(translate(image, t)),
+        ImageBgr8(image) => ImageBgr8(translate(image, t)),
+        ImageBgra8(image) => ImageBgra8(translate(image, t)),
     }
 }

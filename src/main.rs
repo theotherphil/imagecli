@@ -18,10 +18,7 @@ type ImageStack = stack::Stack<DynamicImage>;
 //  - support different signatures in Array op
 //  - example showing changing format of all images in a directory maching some pattern
 //  - flip, thumbnails, crop, allow targeting a fixed size image
-//  - add constant images
 //  - add ability to add margins
-//  - support user-defined functions over pixels, e.g. map \x -> x * 0.3
-//  - add support for everything else relevant from imageproc
 //  - add validation for parsing of individual stages (make them subcommands somehow?)
 //      or use a parser combinatory library, e.g. nom
 //  - add specific subcommands for the pipeline stages?

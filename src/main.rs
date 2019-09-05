@@ -4,9 +4,8 @@ use image::{DynamicImage, GenericImageView, open};
 
 mod stack;
 mod image_ops;
-use crate::image_ops::ImageOp;
+use crate::image_ops::Op;
 mod stack_ops;
-use crate::stack_ops::StackOp;
 mod expr;
 mod error;
 use crate::error::Result;
@@ -61,7 +60,7 @@ fn main() -> Result<()> {
         }
     }
     let outputs = if opt.pipeline.is_some() {
-        let inputs = inputs.into_iter().map(|(_, i)| i).collect(); 
+        let inputs = inputs.into_iter().map(|(_, i)| i).collect();
         run_pipeline(&opt.pipeline.unwrap(), inputs, opt.verbose > 0)
     } else {
         inputs.into_iter().map(|(_, i)| i).collect()
@@ -88,31 +87,4 @@ fn run_pipeline(pipeline: &str, inputs: Vec<DynamicImage>, verbose: bool) -> Vec
     }
 
     stack.contents()
-}
-
-/// A pipeline operation - either a direct manipulation of the stack,
-/// or an image operation which reads from and writes to the top of the stack.
-#[derive(Debug)]
-pub enum Op {
-    StackOp(StackOp),
-    ImageOp(Box<dyn ImageOp>),
-}
-
-impl Op {
-    fn parse(op: &str) -> Option<Op> {
-        match StackOp::parse(op) {
-            Some(o) => Some(Op::StackOp(o)),
-            None => match image_ops::parse(op) {
-                Some(o) => Some(Op::ImageOp(o)),
-                None => None,
-            }
-        }
-    }
-
-    fn apply(&self, stack: &mut ImageStack) {
-        match self {
-            Op::StackOp(s) => s.apply(stack),
-            Op::ImageOp(o) => o.apply(stack),
-        }
-    }
 }

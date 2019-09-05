@@ -7,6 +7,34 @@ use imageproc::definitions::Clamp;
 use crate::expr::Expr;
 use std::cmp;
 use crate::ImageStack;
+use crate::stack_ops::StackOp;
+
+/// A pipeline operation - either a direct manipulation of the stack,
+/// or an image operation which reads from and writes to the top of the stack.
+#[derive(Debug)]
+pub enum Op {
+    StackOp(StackOp),
+    ImageOp(Box<dyn ImageOp>),
+}
+
+impl Op {
+    pub fn parse(op: &str) -> Option<Op> {
+        match StackOp::parse(op) {
+            Some(o) => Some(Op::StackOp(o)),
+            None => match parse(op) {
+                Some(o) => Some(Op::ImageOp(o)),
+                None => None,
+            }
+        }
+    }
+
+    pub fn apply(&self, stack: &mut ImageStack) {
+        match self {
+            Op::StackOp(s) => s.apply(stack),
+            Op::ImageOp(o) => o.apply(stack),
+        }
+    }
+}
 
 /// An image processing operation that operates on a stack of images.
 pub trait ImageOp : std::fmt::Debug {
@@ -63,6 +91,183 @@ pub fn parse(op: &str) -> Option<Box<dyn ImageOp>> {
         "translate" => Some(Box::new(Translate(split[1].parse().unwrap(), split[2].parse().unwrap()))),
         _ => None,
     }
+}
+
+use nom::{
+    IResult,
+    error::ErrorKind,
+    branch::alt,
+    bytes::complete::{tag, tag_no_case},
+    combinator::{map, map_res},
+    character::complete::{digit1, space0, space1},
+    multi::{many1, separated_list},
+    number::complete::float,
+    sequence::{delimited, pair, tuple}
+};
+
+// TODO: Should we reject e.g. three numbers for Grid in the stage parsers or the pipeline parser.
+// TODO: Probably in the stage parsers, but lets ignore this for now.
+// TODO: When combining parsers for stages we need to allow for any whitespace
+// TODO: around the sequence operator "   >  "
+
+fn parse_pipeline(input: &str) -> IResult<&str, Vec<Box<dyn ImageOp>>> {
+    // ignore stack ops for now.
+    separated_list(
+        parse_connector,
+        parse_image_op
+    )(input)
+}
+
+#[test]
+fn test_parse_pipeline() {
+    let pipeline = "grid 1 2 > gray > scale 3 > id";
+    let parsed = parse_pipeline(pipeline);
+    match parsed {
+        Err(_) => panic!("Parse should succeed"),
+        Ok((i, v)) => {
+            assert_eq!(i, "");
+            let descriptions: Vec<String> = v.iter().map(|o| format!("{:?}", o)).collect();
+            let expected: Vec<String> = vec!["Grid(1, 2)", "Gray", "Scale(3.0)", "Id"]
+                .into_iter()
+                .map(|s| s.into())
+                .collect();
+            assert_eq!(descriptions, expected);
+        }
+    }
+}
+
+/// I wanted to write this as a function, but got confused by the resulting compiler errors.
+macro_rules! box_output {
+    ($parser:expr) => {
+        map($parser, |o| {
+            let boxed: Box<dyn ImageOp> = Box::new(o);
+            boxed
+        })
+    }
+}
+
+fn parse_image_op(input: &str) -> IResult<&str, Box<dyn ImageOp>> {
+    alt((
+        box_output!(parse_grid),
+        box_output!(parse_gray),
+        box_output!(parse_scale),
+        box_output!(parse_id),
+    ))(input)
+}
+
+fn parse_connector(input: &str) -> IResult<&str, ()> {
+    let (i, _) = space0(input)?;
+    let (i, _) = tag(">")(i)?;
+    let (i, _) = space0(i)?;
+    Ok((i, ()))
+}
+
+// 'grid 12 34' -> Grid(12, 34)
+fn parse_grid(input: &str) -> IResult<&str, Grid> {
+    let (i, _) = tag_no_case("grid")(input)?;
+    let (i, _) = space1(i)?;
+    let (i, width) = map_res(digit1, |s: &str| s.parse::<u32>())(i)?;
+    let (i, _) = space1(i)?;
+    let (i, height) = map_res(digit1, |s: &str| s.parse::<u32>())(i)?;
+    Ok((i, Grid(width, height)))
+}
+
+// 'gray' -> Gray
+fn parse_gray(input: &str) -> IResult<&str, Gray> {
+    map(tag_no_case("gray"), |_| Gray)(input)
+}
+
+// 'id' -> Id
+fn parse_id(input: &str) -> IResult<&str, Id> {
+    map(tag_no_case("id"), |_| Id)(input)
+}
+
+// 'scale 12' -> Scale(12.0)
+fn parse_scale(input: &str) -> IResult<&str, Scale> {
+    let (i, _) = tag_no_case("scale")(input)?;
+    let (i, _) = space1(i)?;
+    let (i, scale) = float(i)?;
+    Ok((i, Scale(scale)))
+}
+
+// 'hcat' -> Grid 2 1
+// 'hcat 3' -> Grid 3 1
+fn parse_hcat(input: &str) -> IResult<&str, Grid> {
+    // TODO: handle specified width. use nom::combinator::opt
+    let (i, _) = tag_no_case("hcat")(input)?;
+    Ok((i, Grid(2, 1)))
+}
+
+#[test]
+fn test_parse_hcat() {
+    // No width provided - default to 2
+    assert_eq!(
+        parse_hcat("hcat"),
+        Ok(("", Grid(2, 1)))
+    );
+    // Width provided
+    // TODO
+    // assert_eq!(
+    //     parse_hcat("hcat 3"),
+    //     Ok(("", Grid(3, 1)))
+    // );
+}
+
+#[test]
+fn test_parse_scale() {
+    // Literal doesn't match
+    assert_eq!(
+        parse_scale("circle 1 2 3"),
+        Err(nom::Err::Error(("circle 1 2 3", ErrorKind::Tag)))
+    );
+    // No number provided
+    assert_eq!(
+        parse_scale("scale"),
+        Err(nom::Err::Error(("", ErrorKind::Space)))
+    );
+    // Correct incantation, integer literal
+    assert_eq!(
+        parse_scale("scale 3"),
+        Ok(("", Scale(3.0)))
+    );
+    // Correct incantation, floating point literal
+    assert_eq!(
+        parse_scale("scale 3.0"),
+        Ok(("", Scale(3.0)))
+    );
+}
+
+#[test]
+fn test_parse_gray() {
+    // Literal doesn't match
+    assert_eq!(
+        parse_gray("blue"),
+        Err(nom::Err::Error(("blue", ErrorKind::Tag)))
+    );
+    // Literal matches
+    assert_eq!(
+        parse_gray("gray"),
+        Ok(("", Gray))
+    );
+}
+
+#[test]
+fn test_parse_grid() {
+    // Literal doesn't match
+    assert_eq!(
+        parse_grid("circle 1 2 3"),
+        Err(nom::Err::Error(("circle 1 2 3", ErrorKind::Tag)))
+    );
+    // Only one number provided
+    assert_eq!(
+        parse_grid("grid 12"),
+        Err(nom::Err::Error(("", ErrorKind::Space)))
+    );
+    // Correct incantation
+    assert_eq!(
+        parse_grid("grid 12 34"),
+        Ok(("", Grid(12, 34)))
+    );
 }
 
 fn parse_circle(def: &str) -> Circle {
@@ -136,11 +341,11 @@ where
 {
     let image = stack.pop();
     let result = f(&image);
-    stack.push(result);    
+    stack.push(result);
 }
 
 /// Scale both width and height by given multiplier.
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 struct Scale(f32);
 
 impl ImageOp for Scale {
@@ -155,7 +360,7 @@ fn scale(image: &DynamicImage, scale: f32) -> DynamicImage {
 }
 
 /// Apply a Gaussian blur with the given standard deviation.
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 struct Gaussian(f32);
 
 impl ImageOp for Gaussian {
@@ -177,7 +382,7 @@ fn gaussian(image: &DynamicImage, sigma: f32) -> DynamicImage {
 }
 
 /// Convert to grayscale.
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 struct Gray;
 
 impl ImageOp for Gray {
@@ -187,7 +392,7 @@ impl ImageOp for Gray {
 }
 
  /// Rotate clockwise about the image's center by the given angle in degrees.
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 struct Rotate(f32);
 
 impl ImageOp for Rotate {
@@ -222,7 +427,7 @@ fn rotate(image: &DynamicImage, theta: f32) -> DynamicImage {
 }
 
 /// Compute image gradients using the Sobel filter.
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 struct Sobel;
 
 impl ImageOp for Sobel {
@@ -257,7 +462,7 @@ fn sobel(image: &DynamicImage) -> DynamicImage {
 }
 
 /// Apply seam carving to shrink the image to a provided multiple of its original width.
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 struct Carve(f32);
 
 impl ImageOp for Carve {
@@ -281,7 +486,7 @@ fn carve(image: &DynamicImage, ratio: f32) -> DynamicImage {
 }
 
 /// Binarise the image using an adaptive thresholding with given block radius.
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 struct AdaptiveThreshold(u32);
 
 impl ImageOp for AdaptiveThreshold {
@@ -296,7 +501,7 @@ fn adaptive_threshold(image: &DynamicImage, block_radius: u32) -> DynamicImage {
 }
 
 /// Binarise the image using Otsu thresholding.
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 struct OtsuThreshold;
 
 impl ImageOp for OtsuThreshold {
@@ -312,7 +517,7 @@ fn otsu_threshold(image: &DynamicImage) -> DynamicImage {
 }
 
 /// Arrange images into a grid. First argument is the number of columns and second the number of rows.
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 struct Grid(u32, u32);
 
 impl ImageOp for Grid {
@@ -364,7 +569,7 @@ fn grid(images: &[DynamicImage], cols: u32, rows: u32) -> DynamicImage {
 }
 
 /// Apply a median filter with the given x radius and y radius.
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 struct Median(u32, u32);
 
 impl ImageOp for Median {
@@ -405,7 +610,7 @@ impl ImageOp for Array {
 }
 
 /// Extract the red channel from an image.
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 struct Red;
 
 impl ImageOp for Red {
@@ -421,7 +626,7 @@ fn red(image: &DynamicImage) -> DynamicImage {
 }
 
 /// Extract the green channel from an image.
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 struct Green;
 
 impl ImageOp for Green {
@@ -437,7 +642,7 @@ fn green(image: &DynamicImage) -> DynamicImage {
 }
 
 /// Extract the blue channel from an image.
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 struct Blue;
 
 impl ImageOp for Blue {
@@ -453,7 +658,7 @@ fn blue(image: &DynamicImage) -> DynamicImage {
 }
 
 /// The identity function. Sometimes helpful to make pipelines easier to write.
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 struct Id;
 
 impl ImageOp for Id {
@@ -612,7 +817,7 @@ where
 // TODO: injected at the start of the pipeline, rather than manipulating the existing stack.
 
 /// Create an image with a single constant value.
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct Const {
     width: u32,
     height: u32,
@@ -624,7 +829,7 @@ enum ColorSpace {
     Luma, LumaA, Rgb, Rgba, Bgr, Bgra
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 enum Color {
     Luma(Luma<u8>),
     LumaA(LumaA<u8>),
@@ -679,7 +884,7 @@ fn constant(c: &Const) -> DynamicImage {
 enum FillType { Filled, Hollow }
 
 /// Draw a circle with the given center, radius, color, and fill type.
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct Circle {
     fill: FillType,
     center: (i32, i32),
@@ -716,7 +921,7 @@ fn draw_circle(image: &DynamicImage, circle: &Circle) -> DynamicImage {
 }
 
 /// Translate the image.
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 struct Translate(i32, i32);
 
 impl ImageOp for Translate {

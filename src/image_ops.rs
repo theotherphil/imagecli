@@ -7,80 +7,6 @@ use imageproc::definitions::Clamp;
 use crate::expr::Expr;
 use std::cmp;
 use crate::ImageStack;
-
-/// An image processing operation that operates on a stack of images.
-pub trait ImageOp : std::fmt::Debug {
-    fn apply(&self, stack: &mut ImageStack);
-}
-
-pub fn parse(op: &str) -> Option<Box<dyn ImageOp>> {
-    if op.starts_with("[") && op.ends_with("]") {
-        // TODO: find the method I actually want here when I have internet again
-        let ch: Vec<char> = op.chars().skip(1).collect();
-        let ch = &ch[..ch.len() - 1];
-        let op: String = ch.iter().collect();
-        let split: Vec<&str> = op.split(',').map(|s| s.trim()).collect();
-        let mut ops: Vec<Box<dyn ImageOp>> = Vec::new();
-        for s in split {
-            if let Some(o) = parse(s) {
-                ops.push(o);
-            } else {
-                return None;
-            }
-        }
-        return Some(Box::new(Array(ops)));
-    }
-    let split: Vec<&str> = op.split_whitespace().collect();
-    match split[0] {
-        "DUP" => {
-            if split.len() == 1 {
-                Some(Box::new(Dup(1)))
-            } else {
-                Some(Box::new(Dup(split[1].parse().unwrap())))
-            }
-        },
-        "DROP" => Some(Box::new(Drop)),
-        "SWAP" => Some(Box::new(Rot(2))),
-        "ROT" => {
-            if split.len() == 1 {
-                Some(Box::new(Rot(3)))
-            } else {
-                Some(Box::new(Rot(split[1].parse().unwrap())))
-            }
-        },
-        "scale" => Some(Box::new(Scale(split[1].parse().unwrap()))),
-        "gaussian" => Some(Box::new(Gaussian(split[1].parse().unwrap()))),
-        "gray" => Some(Box::new(Gray)),
-        "rotate" => Some(Box::new(Rotate(split[1].parse().unwrap()))),
-        "sobel" => Some(Box::new(Sobel)),
-        "carve" => Some(Box::new(Carve(split[1].parse().unwrap()))),
-        "athresh" => Some(Box::new(AdaptiveThreshold(split[1].parse().unwrap()))),
-        "othresh" => Some(Box::new(OtsuThreshold)),
-        "hcat" => if split.len() == 1 {
-            Some(Box::new(Grid(2, 1)))
-        } else {
-            Some(Box::new(Grid(split[1].parse().unwrap(), 1)))
-        },
-        "vcat" => if split.len() == 1 {
-            Some(Box::new(Grid(1, 2)))
-        } else {
-            Some(Box::new(Grid(1, split[1].parse().unwrap())))
-        },
-        "grid" => Some(Box::new(Grid(split[1].parse().unwrap(), split[2].parse().unwrap()))),
-        "median" => Some(Box::new(Median(split[1].parse().unwrap(), split[2].parse().unwrap()))),
-        "red" => Some(Box::new(Red)),
-        "green" => Some(Box::new(Green)),
-        "blue" => Some(Box::new(Blue)),
-        "id" => Some(Box::new(Id)),
-        "func" => Some(Box::new(parse_func(op))),
-        "func2" => Some(Box::new(parse_func2(op))),
-        "const" => Some(Box::new(parse_const(op))),
-        "circle" => Some(Box::new(parse_circle(op))),
-        "translate" => Some(Box::new(Translate(split[1].parse().unwrap(), split[2].parse().unwrap()))),
-        _ => None,
-    }
-}
-
 use nom::{
     IResult,
     error::ErrorKind,
@@ -88,26 +14,122 @@ use nom::{
     bytes::complete::{tag, tag_no_case},
     combinator::{map, map_res, opt},
     character::complete::{digit1, space0, space1},
-    multi::{many1, separated_list},
+    multi::separated_list,
     number::complete::float,
-    sequence::{delimited, pair, tuple, preceded}
+    sequence::{delimited, pair, preceded}
 };
 
-// TODO: Should we reject e.g. three numbers for Grid in the stage parsers or the pipeline parser.
-// TODO: Probably in the stage parsers, but lets ignore this for now.
-// TODO: When combining parsers for stages we need to allow for any whitespace
-// TODO: around the sequence operator "   >  "
+/// An image processing operation that operates on a stack of images.
+pub trait ImageOp : std::fmt::Debug {
+    fn apply(&self, stack: &mut ImageStack);
+}
+
+pub fn parse(pipeline: &str) -> Vec<Box<dyn ImageOp>> {
+    let pipeline = parse_pipeline(pipeline);
+    match pipeline {
+        Ok(p) => p.1,
+        Err(e) => {
+            panic!("Unable to parse pipeline: {:?}", e)
+        }
+    }
+}
 
 fn parse_pipeline(input: &str) -> IResult<&str, Vec<Box<dyn ImageOp>>> {
-    // ignore stack ops for now.
     separated_list(
         parse_connector,
         parse_image_op
     )(input)
 }
 
+fn parse_connector(input: &str) -> IResult<&str, ()> {
+    let (i, _) = space0(input)?;
+    let (i, _) = tag(">")(i)?;
+    let (i, _) = space0(i)?;
+    Ok((i, ()))
+}
+
+/// I wanted to write this as a function, but got confused by the resulting compiler errors.
+macro_rules! box_output {
+    ($parser:expr) => {
+        map($parser, |o| {
+            let boxed: Box<dyn ImageOp> = Box::new(o);
+            boxed
+        })
+    }
+}
+
+fn parse_image_op(input: &str) -> IResult<&str, Box<dyn ImageOp>> {
+    // Nested alts are required because alt only supports tuples with up 21 elements.
+    alt((
+        alt((
+            box_output!(parse_adaptive_threshold),
+            box_output!(parse_array),
+            box_output!(parse_blue),
+            box_output!(parse_carve),
+            box_output!(parse_circle),
+            box_output!(parse_const),
+            box_output!(parse_drop),
+            box_output!(parse_dup),
+            box_output!(parse_func),
+            box_output!(parse_func2),
+            box_output!(parse_gaussian),
+            box_output!(parse_gray),
+            box_output!(parse_green),
+            box_output!(parse_grid),
+            box_output!(parse_hcat),
+            box_output!(parse_id),
+            box_output!(parse_median),
+            box_output!(parse_othresh),
+            box_output!(parse_red),
+            box_output!(parse_rot),
+            box_output!(parse_rotate),
+        )),
+        alt((
+            box_output!(parse_scale),
+            box_output!(parse_sobel),
+            box_output!(parse_swap),
+            box_output!(parse_translate),
+            box_output!(parse_vcat),
+        )),
+    ))(input)
+}
+
+// TODO: remove duplication between this and parse_pipeline
+fn parse_array(input: &str) -> IResult<&str, Array> {
+    map(
+        delimited(
+            tag("["),
+            separated_list(
+                delimited(space0, tag(","), space0),
+                parse_image_op
+            ),
+            tag("]")
+        ),
+        |v| Array(v)
+    )(input)
+}
+
 #[test]
-fn test_parse_pipeline() {
+fn test_parse_single_stage_pipeline() {
+    let pipeline = "circle filled 231 337 100 (255, 255, 0)";
+    let parsed = parse_pipeline(pipeline);
+    match parsed {
+        Err(_) => panic!("Parse should succeed"),
+        Ok((i, v)) => {
+            assert_eq!(i, "");
+            let descriptions: Vec<String> = v.iter().map(|o| format!("{:?}", o)).collect();
+            let expected = vec![
+                String::from(
+                    "Circle { fill: Filled, center: (231, 337), radius: 100, color: Rgb(Rgb([255, 255, 0])) }"
+                )
+            ];
+            assert_eq!(descriptions, expected);
+        }
+    }
+}
+
+#[test]
+fn test_parse_multi_stage_pipeline() {
     let pipeline = "grid 1 2 > gray > scale 3 > id";
     let parsed = parse_pipeline(pipeline);
     match parsed {
@@ -124,40 +146,13 @@ fn test_parse_pipeline() {
     }
 }
 
-/// I wanted to write this as a function, but got confused by the resulting compiler errors.
-macro_rules! box_output {
-    ($parser:expr) => {
-        map($parser, |o| {
-            let boxed: Box<dyn ImageOp> = Box::new(o);
-            boxed
-        })
-    }
+fn usize_(input: &str) -> IResult<&str, usize> {
+    map_res(digit1, |s: &str| s.parse::<usize>())(input)
 }
 
-fn parse_image_op(input: &str) -> IResult<&str, Box<dyn ImageOp>> {
-    alt((
-        box_output!(parse_grid),
-        box_output!(parse_gray),
-        box_output!(parse_scale),
-        box_output!(parse_id),
-    ))(input)
+fn uint8(input: &str) -> IResult<&str, u8> {
+    map_res(digit1, |s: &str| s.parse::<u8>())(input)
 }
-
-fn parse_connector(input: &str) -> IResult<&str, ()> {
-    let (i, _) = space0(input)?;
-    let (i, _) = tag(">")(i)?;
-    let (i, _) = space0(i)?;
-    Ok((i, ()))
-}
-
-// TODO: Remaining image ops that need parsers. Also need to get rid of the
-// TODO: distinction between image and stack ops - they can all just implement the same trait.
-//
-// Array is handled specially
-// "func" => Some(Box::new(parse_func(op))),
-// "func2" => Some(Box::new(parse_func2(op))),
-// "const" => Some(Box::new(parse_const(op))),
-// "circle" => Some(Box::new(parse_circle(op))),
 
 fn uint32(input: &str) -> IResult<&str, u32> {
     map_res(digit1, |s: &str| s.parse::<u32>())(input)
@@ -208,6 +203,7 @@ named_empty_struct_parsers!(
     parse_blue, "blue", Blue;
     parse_sobel, "sobel", Sobel;
     parse_othresh, "othresh", OtsuThreshold;
+    parse_drop, "DROP", Drop;
 );
 
 // 'scale 12' -> Scale(12.0)
@@ -251,8 +247,33 @@ where
     Ok((i, f(val)))
 }
 
+// 'DUP' -> Dup(1)
+// 'DUP 3' -> Dup(3)
+fn parse_dup(input: &str) -> IResult<&str, Dup> {
+    let (i, _) = tag_no_case("dup")(input)?;
+    let (i, w) = opt_space_then_usize(i)?;
+    Ok((i, Dup(w.unwrap_or(1))))
+}
+
+// 'ROT' -> Rot(3)
+// 'ROT 4' -> Rot(4)
+fn parse_rot(input: &str) -> IResult<&str, Rot> {
+    let (i, _) = tag_no_case("rot")(input)?;
+    let (i, w) = opt_space_then_usize(i)?;
+    Ok((i, Rot(w.unwrap_or(3))))
+}
+
+// 'SWAP' -> Rot(2)
+fn parse_swap(input: &str) -> IResult<&str, Rot> {
+    map(tag_no_case("swap"), |_| Rot(2))(input)
+}
+
 fn opt_space_then_u32(input: &str) -> IResult<&str, Option<u32>> {
     opt(preceded(space1, uint32))(input)
+}
+
+fn opt_space_then_usize(input: &str) -> IResult<&str, Option<usize>> {
+    opt(preceded(space1, usize_))(input)
 }
 
 // 'hcat' -> Grid 2 1
@@ -269,6 +290,81 @@ fn parse_vcat(input: &str) -> IResult<&str, Grid> {
     let (i, _) = tag_no_case("vcat")(input)?;
     let (i, h) = opt_space_then_u32(i)?;
     Ok((i, Grid(1, h.unwrap_or(2))))
+}
+
+// TODO: Remove duplication between this and parse_const
+// circle filltype cx cy radius (color)
+// Uses the same colour format as const
+fn parse_circle(input: &str) -> IResult<&str, Circle> {
+    let (i, _) = tag_no_case("circle")(input)?;
+    let (i, fill) = map(
+        preceded(
+            space1,
+            alt((tag("filled"), tag("hollow")))
+        ),
+        |s| match s {
+            "filled" => FillType::Filled,
+            "hollow" => FillType::Hollow,
+            _ => unreachable!(),
+        }
+    )(i)?;
+    let (i, cx) = preceded(space1, int32)(i)?;
+    let (i, cy) = preceded(space1, int32)(i)?;
+    let (i, radius) = preceded(space1, int32)(i)?;
+    let (i, _) = space1(i)?;
+    let (i, color) = parse_color(i)?;
+    let c = Circle { fill, center: (cx, cy), radius, color };
+    Ok((i, c))
+}
+
+fn parse_color(input: &str) -> IResult<&str, Color> {
+    map(
+        delimited(
+            tag("("),
+            separated_list(
+                delimited(space0, tag(","), space0),
+                uint8
+            ),
+            tag(")")
+        ),
+        |vs| color_from_vals(&vs)
+    )(input)
+}
+
+// Luma:
+//  const 100 200 (10)
+// LumaA:
+//  const 100 200 (10, 20)
+// Rgb:
+//  const 100 200 (50, 90, 100)
+// Rgba:
+//  const 100 200 (50, 90, 40, 20)
+// Bgr and Bgra not supported
+fn parse_const(input: &str) -> IResult<&str, Const> {
+    let (i, _) = tag_no_case("const")(input)?;
+    let (i, width) = preceded(space1, uint32)(i)?;
+    let (i, height) = preceded(space1, uint32)(i)?;
+    let (i, _) = space1(i)?;
+    let (i, color) = parse_color(i)?;
+    let c = Const { width, height, color };
+    Ok((i, c))
+}
+
+#[test]
+fn test_parse_circle() {
+    // RGB
+    assert_eq!(
+        parse_circle("circle filled 231 337 100 (255, 255, 0)"),
+        Ok((
+            "",
+            Circle {
+                fill: FillType::Filled,
+                center: (231, 337),
+                radius: 100,
+                color: Color::Rgb(Rgb([255, 255, 0]))
+            }
+        ))
+    );
 }
 
 #[test]
@@ -342,23 +438,6 @@ fn test_parse_grid() {
     );
 }
 
-fn parse_circle(def: &str) -> Circle {
-    // TODO: support drawing a centred circle without the caller having to specify the centre.
-    // TODO: need a sensible standardised format for drawing functions.
-    let def = &def[7..];
-    let split: Vec<&str> = def.split_whitespace().collect();
-    let fill = match split[0].to_lowercase().as_str() {
-        "filled" => FillType::Filled,
-        "hollow" => FillType::Hollow,
-        _ => panic!("Invalid fill type"),
-    };
-    let center = (split[1].parse::<i32>().unwrap(), split[2].parse::<i32>().unwrap());
-    let radius = split[3].parse::<i32>().unwrap();
-    let vals: Vec<u8> = split[4..split.len()].iter().map(|v| v.trim()).map(|v| v.parse::<u8>().unwrap()).collect();
-    let color = color_from_vals(&vals);
-    Circle { fill, center, radius, color }
-}
-
 fn color_from_vals(vals: &[u8]) -> Color {
     match vals.len() {
         1 => Color::Luma(Luma([vals[0]])),
@@ -369,42 +448,22 @@ fn color_from_vals(vals: &[u8]) -> Color {
     }
 }
 
-fn parse_const(def: &str) -> Const {
-    let def = &def[6..];
-    // Luma:
-    //  const 100 200 (10)
-    // LumaA:
-    //  const 100 200 (10, 20)
-    // Rgb:
-    //  const 100 200 (50, 90, 100)
-    // Rgba:
-    //  const 100 200 (50, 90, 40, 20)
-    // Bgr and Bgra not supported
-    // TODO: parse operations like a sensible person would
-    let split: Vec<&str> = def.split('(').collect();
-    let dims: Vec<u32> = split[0].split_whitespace().map(|d| d.parse::<u32>().unwrap()).collect();
-    let vals: Vec<u8> = split[1][..split[1].len() - 1].split(',').map(|v| v.trim()).map(|v| v.parse::<u8>().unwrap()).collect();
-    let color = color_from_vals(&vals);
-
-    Const {
-        width: dims[0],
-        height: dims[1],
-        color
-    }
+fn parse_func(input: &str) -> IResult<&str, Func> {
+    // TODO!
+    Err(nom::Err::Error(("circle 1 2 3", ErrorKind::Tag)))
+    // Func {
+    //     text: func.into(),
+    //     expr: crate::expr::parse_func(&func[5..]),
+    // }
 }
 
-fn parse_func(func: &str) -> Func {
-    Func {
-        text: func.into(),
-        expr: crate::expr::parse_func(&func[5..]),
-    }
-}
-
-fn parse_func2(func: &str) -> Func2 {
-    Func2 {
-        text: func.into(),
-        expr: crate::expr::parse_func(&func[6..]),
-    }
+fn parse_func2(input: &str) -> IResult<&str, Func2> {
+    // TODO!
+    Err(nom::Err::Error(("circle 1 2 3", ErrorKind::Tag)))
+    // Func2 {
+    //     text: func.into(),
+    //     expr: crate::expr::parse_func(&func[6..]),
+    // }
 }
 
 fn one_in_one_out<F>(stack: &mut ImageStack, f: F)

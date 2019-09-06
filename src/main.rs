@@ -4,7 +4,7 @@ use image::{DynamicImage, GenericImageView, open};
 
 mod stack;
 mod image_ops;
-use crate::image_ops::{ImageOp, parse};
+use crate::image_ops::parse;
 mod expr;
 mod error;
 use crate::error::Result;
@@ -74,14 +74,8 @@ fn main() -> Result<()> {
 }
 
 fn run_pipeline(pipeline: &str, inputs: Vec<DynamicImage>, verbose: bool) -> Vec<DynamicImage> {
-    // TODO: validation!
-    let ops: Vec<Box<dyn ImageOp>> = pipeline
-        .split('>')
-        .map(|s| s.trim())
-        .map(|s| parse(s).unwrap())
-        .collect();
-
     let mut stack = ImageStack::new(inputs);
+    let ops = parse(pipeline);
 
     for op in ops {
         if verbose {

@@ -15,7 +15,7 @@ use nom::{
     character::complete::{digit1, space0, space1},
     multi::separated_nonempty_list,
     number::complete::float,
-    sequence::{delimited, pair, preceded}
+    sequence::{delimited, pair, preceded, tuple}
 };
 
 /// An image processing operation that operates on a stack of images.
@@ -35,18 +35,12 @@ pub fn parse(pipeline: &str) -> Vec<Box<dyn ImageOp>> {
 
 fn parse_pipeline(input: &str) -> IResult<&str, Vec<Box<dyn ImageOp>>> {
     all_consuming(
-        separated_nonempty_list(
-            parse_connector,
-            parse_image_op
-        )
+        separated_nonempty_list(parse_connector, parse_image_op)
     )(input)
 }
 
 fn parse_connector(input: &str) -> IResult<&str, ()> {
-    let (i, _) = space0(input)?;
-    let (i, _) = tag(">")(i)?;
-    let (i, _) = space0(i)?;
-    Ok((i, ()))
+    delimited(space0, map(tag(">"), |s: &str| ()), space0)(input)
 }
 
 /// I wanted to write this as a function, but got confused by the resulting compiler errors.
@@ -110,42 +104,42 @@ fn parse_array(input: &str) -> IResult<&str, Array> {
     )(input)
 }
 
-fn usize_(input: &str) -> IResult<&str, usize> {
-    map_res(digit1, |s: &str| s.parse::<usize>())(input)
-}
-
-fn uint8(input: &str) -> IResult<&str, u8> {
-    map_res(digit1, |s: &str| s.parse::<u8>())(input)
-}
-
-fn uint32(input: &str) -> IResult<&str, u32> {
-    map_res(digit1, |s: &str| s.parse::<u32>())(input)
-}
-
-fn int32(input: &str) -> IResult<&str, i32> {
-    map_res(digit1, |s: &str| s.parse::<i32>())(input)
+fn int<T: std::str::FromStr>(input: &str) -> IResult<&str, T> {
+    map_res(digit1, |s: &str| s.parse::<T>())(input)
 }
 
 // 'grid 12 34' -> Grid(12, 34)
 fn parse_grid(input: &str) -> IResult<&str, Grid> {
-    let (i, _) = tag_no_case("grid")(input)?;
-    let (i, (w, h)) = pair(preceded(space1, uint32), preceded(space1, uint32))(i)?;
-    Ok((i, Grid(w, h)))
+    map(
+        preceded(
+            tag_no_case("grid"),
+            pair(preceded(space1, int::<u32>), preceded(space1, int::<u32>))
+        ),
+        |(w, h)| Grid(w, h)
+    )(input)
 }
 
 // TODO: don't duplicate parse_grid
 // 'median 12 34' -> Median(12, 34)
 fn parse_median(input: &str) -> IResult<&str, Median> {
-    let (i, _) = tag_no_case("median")(input)?;
-    let (i, (rx, ry)) = pair(preceded(space1, uint32), preceded(space1, uint32))(i)?;
-    Ok((i, Median(rx, ry)))
+    map(
+        preceded(
+            tag_no_case("median"),
+            pair(preceded(space1, int::<u32>), preceded(space1, int::<u32>))
+        ),
+        |(rx, ry)| Median(rx, ry)
+    )(input)
 }
 
 // 'translate 10 20' -> Translate(10, 20)
 fn parse_translate(input: &str) -> IResult<&str, Translate> {
-    let (i, _) = tag_no_case("translate")(input)?;
-    let (i, (tx, ty)) = pair(preceded(space1, int32), preceded(space1, int32))(i)?;
-    Ok((i, Translate(tx, ty)))
+    map(
+        preceded(
+            tag_no_case("translate"),
+            pair(preceded(space1, int::<i32>), preceded(space1, int::<i32>))
+        ),
+        |(tx, ty)| Translate(tx, ty)
+    )(input)
 }
 
 /// Generates parsers which match a literal and return a struct of the specific field-less type.
@@ -192,10 +186,10 @@ fn parse_carve(input: &str) -> IResult<&str, Carve> {
 
 // 'athresh 12' -> AdaptiveThreshold(12)
 fn parse_adaptive_threshold(input: &str) -> IResult<&str, AdaptiveThreshold> {
-    let (i, _) = tag_no_case("athresh")(input)?;
-    let (i, _) = space1(i)?;
-    let (i, radius) = map_res(digit1, |s: &str| s.parse::<u32>())(i)?;
-    Ok((i, AdaptiveThreshold(radius)))
+    map(
+        preceded(tag_no_case("athresh"), preceded(space1, int::<u32>)),
+        |r| AdaptiveThreshold(r)
+    )(input)
 }
 
 fn parse_single_float_tuple_struct<'a, 'b, T, F>(
@@ -205,26 +199,28 @@ fn parse_single_float_tuple_struct<'a, 'b, T, F>(
 where
     F: Fn(f32) -> T
 {
-    let (i, _) = tag_no_case(name)(input)?;
-    let (i, _) = space1(i)?;
-    let (i, val) = float(i)?;
-    Ok((i, f(val)))
+    map(
+        preceded(tag_no_case(name), preceded(space1, float)),
+        |val| f(val)
+    )(input)
 }
 
 // 'DUP' -> Dup(1)
 // 'DUP 3' -> Dup(3)
 fn parse_dup(input: &str) -> IResult<&str, Dup> {
-    let (i, _) = tag_no_case("dup")(input)?;
-    let (i, w) = opt_space_then_usize(i)?;
-    Ok((i, Dup(w.unwrap_or(1))))
+    map(
+        preceded(tag_no_case("dup"), opt_space_then_usize),
+        |x| Dup(x.unwrap_or(1))
+    )(input)
 }
 
 // 'ROT' -> Rot(3)
 // 'ROT 4' -> Rot(4)
 fn parse_rot(input: &str) -> IResult<&str, Rot> {
-    let (i, _) = tag_no_case("rot")(input)?;
-    let (i, w) = opt_space_then_usize(i)?;
-    Ok((i, Rot(w.unwrap_or(3))))
+    map(
+        preceded(tag_no_case("rot"), opt_space_then_usize),
+        |x| Rot(x.unwrap_or(3))
+    )(input)
 }
 
 // 'SWAP' -> Rot(2)
@@ -233,52 +229,47 @@ fn parse_swap(input: &str) -> IResult<&str, Rot> {
 }
 
 fn opt_space_then_u32(input: &str) -> IResult<&str, Option<u32>> {
-    opt(preceded(space1, uint32))(input)
+    opt(preceded(space1, int::<u32>))(input)
 }
 
 fn opt_space_then_usize(input: &str) -> IResult<&str, Option<usize>> {
-    opt(preceded(space1, usize_))(input)
+    opt(preceded(space1, int::<usize>))(input)
 }
 
 // 'hcat' -> Grid 2 1
 // 'hcat 3' -> Grid 3 1
 fn parse_hcat(input: &str) -> IResult<&str, Grid> {
-    let (i, _) = tag_no_case("hcat")(input)?;
-    let (i, w) = opt_space_then_u32(i)?;
-    Ok((i, Grid(w.unwrap_or(2), 1)))
+    map(
+        preceded(tag_no_case("hcat"), opt_space_then_u32),
+        |x| Grid(x.unwrap_or(2), 1)
+    )(input)
 }
 
 // 'vcat' -> Grid 1 2
 // 'vcat 3' -> Grid 1 3
 fn parse_vcat(input: &str) -> IResult<&str, Grid> {
-    let (i, _) = tag_no_case("vcat")(input)?;
-    let (i, h) = opt_space_then_u32(i)?;
-    Ok((i, Grid(1, h.unwrap_or(2))))
+    map(
+        preceded(tag_no_case("vcat"), opt_space_then_u32),
+        |x| Grid(1, x.unwrap_or(2))
+    )(input)
 }
 
 // TODO: Remove duplication between this and parse_const
 // circle filltype cx cy radius (color)
 // Uses the same colour format as const
 fn parse_circle(input: &str) -> IResult<&str, Circle> {
-    let (i, _) = tag_no_case("circle")(input)?;
-    let (i, fill) = map(
+    map(
         preceded(
-            space1,
-            alt((tag("filled"), tag("hollow")))
+            tag_no_case("circle"),
+            tuple((
+                preceded(space1, alt((tag("filled"), tag("hollow")))),
+                pair(preceded(space1, int::<i32>), preceded(space1, int::<i32>)),
+                preceded(space1, int::<i32>),
+                preceded(space1, parse_color),
+            ))
         ),
-        |s| match s {
-            "filled" => FillType::Filled,
-            "hollow" => FillType::Hollow,
-            _ => unreachable!(),
-        }
-    )(i)?;
-    let (i, cx) = preceded(space1, int32)(i)?;
-    let (i, cy) = preceded(space1, int32)(i)?;
-    let (i, radius) = preceded(space1, int32)(i)?;
-    let (i, _) = space1(i)?;
-    let (i, color) = parse_color(i)?;
-    let c = Circle { fill, center: (cx, cy), radius, color };
-    Ok((i, c))
+        |(fill, center, radius, color)| Circle { fill: fill.into(), center, radius, color }
+    )(input)
 }
 
 fn parse_color(input: &str) -> IResult<&str, Color> {
@@ -287,7 +278,7 @@ fn parse_color(input: &str) -> IResult<&str, Color> {
             tag("("),
             separated_nonempty_list(
                 delimited(space0, tag(","), space0),
-                uint8
+                int::<u8>
             ),
             tag(")")
         ),
@@ -305,13 +296,17 @@ fn parse_color(input: &str) -> IResult<&str, Color> {
 //  const 100 200 (50, 90, 40, 20)
 // Bgr and Bgra not supported
 fn parse_const(input: &str) -> IResult<&str, Const> {
-    let (i, _) = tag_no_case("const")(input)?;
-    let (i, width) = preceded(space1, uint32)(i)?;
-    let (i, height) = preceded(space1, uint32)(i)?;
-    let (i, _) = space1(i)?;
-    let (i, color) = parse_color(i)?;
-    let c = Const { width, height, color };
-    Ok((i, c))
+    map(
+        preceded(
+            tag_no_case("const"),
+            tuple((
+                preceded(space1, int::<u32>),
+                preceded(space1, int::<u32>),
+                preceded(space1, parse_color)
+            ))
+        ),
+        |(width, height, color)| Const { width, height, color }
+    )(input)
 }
 
 fn color_from_vals(vals: &[u8]) -> Color {
@@ -910,6 +905,16 @@ fn constant(c: &Const) -> DynamicImage {
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 enum FillType { Filled, Hollow }
+
+impl From<&str> for FillType {
+    fn from(fill: &str) -> Self {
+        match fill {
+            "filled" => FillType::Filled,
+            "hollow" => FillType::Hollow,
+            _ => panic!("Invalid FillType"),
+        }
+    }
+}
 
 /// Draw a circle with the given center, radius, color, and fill type.
 #[derive(Debug, Clone, PartialEq, Eq)]

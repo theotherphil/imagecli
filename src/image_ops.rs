@@ -108,40 +108,6 @@ fn int<T: std::str::FromStr>(input: &str) -> IResult<&str, T> {
     map_res(digit1, |s: &str| s.parse::<T>())(input)
 }
 
-// 'grid 12 34' -> Grid(12, 34)
-fn parse_grid(input: &str) -> IResult<&str, Grid> {
-    map(
-        preceded(
-            tag_no_case("grid"),
-            pair(preceded(space1, int::<u32>), preceded(space1, int::<u32>))
-        ),
-        |(w, h)| Grid(w, h)
-    )(input)
-}
-
-// TODO: don't duplicate parse_grid
-// 'median 12 34' -> Median(12, 34)
-fn parse_median(input: &str) -> IResult<&str, Median> {
-    map(
-        preceded(
-            tag_no_case("median"),
-            pair(preceded(space1, int::<u32>), preceded(space1, int::<u32>))
-        ),
-        |(rx, ry)| Median(rx, ry)
-    )(input)
-}
-
-// 'translate 10 20' -> Translate(10, 20)
-fn parse_translate(input: &str) -> IResult<&str, Translate> {
-    map(
-        preceded(
-            tag_no_case("translate"),
-            pair(preceded(space1, int::<i32>), preceded(space1, int::<i32>))
-        ),
-        |(tx, ty)| Translate(tx, ty)
-    )(input)
-}
-
 /// Generates parsers which match a literal and return a struct of the specific field-less type.
 macro_rules! named_empty_struct_parsers {
     ($( $parser_name:ident, $name:expr, $type:ident );* $(;)? )  => {
@@ -164,94 +130,144 @@ named_empty_struct_parsers!(
     parse_drop, "DROP", Drop;
 );
 
+// Operator which takes no args
+fn op_zero<'a, 'b, T: Clone>(input: &'a str, name: &'b str, t: T) -> IResult<&'a str, T> {
+    map(tag_no_case(name), |_| t.clone())(input)
+}
+
+// Operator which takes a single arg
+fn op_one<'a, 'b, T, F1, A1, G>(
+    input: &'a str,
+    name: &'b str,
+    arg1: F1,
+    build: G
+) -> IResult<&'a str, T>
+where
+    F1: Fn(&'a str) -> IResult<&'a str, A1>,
+    G: Fn(A1) -> T
+{
+    map(
+        preceded(
+            tag_no_case(name),
+            preceded(space1, arg1)
+        ),
+        build
+    )(input)
+}
+
+// Operator which takes a single optional arg
+// TODO: unify with op_one
+fn op_one_opt<'a, 'b, T, F1, A1, G>(
+    input: &'a str,
+    name: &'b str,
+    arg1: F1,
+    build: G
+) -> IResult<&'a str, T>
+where
+    F1: Fn(&'a str) -> IResult<&'a str, A1>,
+    G: Fn(Option<A1>) -> T
+{
+    map(
+        preceded(
+            tag_no_case(name),
+            opt(preceded(space1, arg1))
+        ),
+        build
+    )(input)
+}
+
+// Operator which takes twp args
+fn op_two<'a, 'b, T, F1, F2, A1, A2, G>(
+    input: &'a str,
+    name: &'b str,
+    arg1: F1,
+    arg2: F2,
+    build: G
+) -> IResult<&'a str, T>
+where
+    F1: Fn(&'a str) -> IResult<&'a str, A1>,
+    F2: Fn(&'a str) -> IResult<&'a str, A2>,
+    G: Fn(A1, A2) -> T
+{
+    map(
+        preceded(
+            tag_no_case(name),
+            tuple((
+                preceded(space1, arg1),
+                preceded(space1, arg2),
+            ))
+        ),
+        |(val1, val2)| build(val1, val2)
+    )(input)
+}
+
+// 'grid 12 34' -> Grid(12, 34)
+fn parse_grid(input: &str) -> IResult<&str, Grid> {
+    op_two(input, "grid", int::<u32>, int::<u32>, |w, h| Grid(w, h))
+}
+
+// 'median 12 34' -> Median(12, 34)
+fn parse_median(input: &str) -> IResult<&str, Median> {
+    op_two(input, "median", int::<u32>, int::<u32>, |rx, ry| Median(rx, ry))
+}
+
+// 'translate 10 20' -> Translate(10, 20)
+fn parse_translate(input: &str) -> IResult<&str, Translate> {
+    op_two(input, "translate", int::<i32>, int::<i32>, |tx, ty| Translate(tx, ty))
+}
+
 // 'scale 12' -> Scale(12.0)
 fn parse_scale(input: &str) -> IResult<&str, Scale> {
-    parse_single_float_tuple_struct(input, "scale", |x| Scale(x))
+    op_one(input, "scale", float, |x| Scale(x))
 }
 
 // 'gaussian 12' -> Gaussian(12.0)
 fn parse_gaussian(input: &str) -> IResult<&str, Gaussian> {
-    parse_single_float_tuple_struct(input, "gaussian", |x| Gaussian(x))
+    op_one(input, "gaussian", float, |x| Gaussian(x))
 }
 
 // 'rotate 45' -> Rotate(45.0)
 fn parse_rotate(input: &str) -> IResult<&str, Rotate> {
-    parse_single_float_tuple_struct(input, "rotate", |x| Rotate(x))
+    op_one(input, "rotate", float, |x| Rotate(x))
 }
 
 // 'carve 0.85' -> Carve(0.85)
 fn parse_carve(input: &str) -> IResult<&str, Carve> {
-    parse_single_float_tuple_struct(input, "carve", |x| Carve(x))
+    op_one(input, "carve", float, |x| Carve(x))
 }
 
 // 'athresh 12' -> AdaptiveThreshold(12)
 fn parse_adaptive_threshold(input: &str) -> IResult<&str, AdaptiveThreshold> {
-    map(
-        preceded(tag_no_case("athresh"), preceded(space1, int::<u32>)),
-        |r| AdaptiveThreshold(r)
-    )(input)
-}
-
-fn parse_single_float_tuple_struct<'a, 'b, T, F>(
-    input: &'a str,
-    name: &'b str, f: F
-) -> IResult<&'a str, T>
-where
-    F: Fn(f32) -> T
-{
-    map(
-        preceded(tag_no_case(name), preceded(space1, float)),
-        |val| f(val)
-    )(input)
+    op_one(input, "athresh", int::<u32>, |x| AdaptiveThreshold(x))
 }
 
 // 'DUP' -> Dup(1)
 // 'DUP 3' -> Dup(3)
 fn parse_dup(input: &str) -> IResult<&str, Dup> {
-    map(
-        preceded(tag_no_case("dup"), opt_space_then_usize),
-        |x| Dup(x.unwrap_or(1))
-    )(input)
+    op_one_opt(input, "dup", int::<usize>, |x| Dup(x.unwrap_or(1)))
 }
 
 // 'ROT' -> Rot(3)
 // 'ROT 4' -> Rot(4)
 fn parse_rot(input: &str) -> IResult<&str, Rot> {
-    map(
-        preceded(tag_no_case("rot"), opt_space_then_usize),
-        |x| Rot(x.unwrap_or(3))
-    )(input)
+    op_one_opt(input, "rot", int::<usize>, |x| Rot(x.unwrap_or(3)))
 }
 
 // 'SWAP' -> Rot(2)
 fn parse_swap(input: &str) -> IResult<&str, Rot> {
-    map(tag_no_case("swap"), |_| Rot(2))(input)
-}
-
-fn opt_space_then_u32(input: &str) -> IResult<&str, Option<u32>> {
-    opt(preceded(space1, int::<u32>))(input)
-}
-
-fn opt_space_then_usize(input: &str) -> IResult<&str, Option<usize>> {
-    opt(preceded(space1, int::<usize>))(input)
+    op_zero(input, "swap", Rot(2))
 }
 
 // 'hcat' -> Grid 2 1
 // 'hcat 3' -> Grid 3 1
 fn parse_hcat(input: &str) -> IResult<&str, Grid> {
-    map(
-        preceded(tag_no_case("hcat"), opt_space_then_u32),
-        |x| Grid(x.unwrap_or(2), 1)
-    )(input)
+    op_one_opt(input, "hcat", int::<u32>, |x| Grid(x.unwrap_or(2), 1))
 }
 
 // 'vcat' -> Grid 1 2
 // 'vcat 3' -> Grid 1 3
 fn parse_vcat(input: &str) -> IResult<&str, Grid> {
-    map(
-        preceded(tag_no_case("vcat"), opt_space_then_u32),
-        |x| Grid(1, x.unwrap_or(2))
-    )(input)
+    op_one_opt(input, "vcat", int::<u32>, |x| Grid(1, x.unwrap_or(2)))
 }
 
 // TODO: Remove duplication between this and parse_const

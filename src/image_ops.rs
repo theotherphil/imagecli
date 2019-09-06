@@ -9,12 +9,11 @@ use std::cmp;
 use crate::ImageStack;
 use nom::{
     IResult,
-    error::ErrorKind,
     branch::alt,
     bytes::complete::{tag, tag_no_case},
-    combinator::{map, map_res, opt},
+    combinator::{all_consuming, map, map_res, opt},
     character::complete::{digit1, space0, space1},
-    multi::separated_list,
+    multi::separated_nonempty_list,
     number::complete::float,
     sequence::{delimited, pair, preceded}
 };
@@ -24,9 +23,6 @@ pub trait ImageOp : std::fmt::Debug {
     fn apply(&self, stack: &mut ImageStack);
 }
 
-// TODO:
-// - if the pipeline consists of a single malformed stage then it just gets ignored without errors
-// - if the pipeline contains a dodgy stage then we just skip the rest without erroring
 pub fn parse(pipeline: &str) -> Vec<Box<dyn ImageOp>> {
     let pipeline = parse_pipeline(pipeline);
     match pipeline {
@@ -38,9 +34,11 @@ pub fn parse(pipeline: &str) -> Vec<Box<dyn ImageOp>> {
 }
 
 fn parse_pipeline(input: &str) -> IResult<&str, Vec<Box<dyn ImageOp>>> {
-    separated_list(
-        parse_connector,
-        parse_image_op
+    all_consuming(
+        separated_nonempty_list(
+            parse_connector,
+            parse_image_op
+        )
     )(input)
 }
 
@@ -102,7 +100,7 @@ fn parse_array(input: &str) -> IResult<&str, Array> {
     map(
         delimited(
             tag("["),
-            separated_list(
+            separated_nonempty_list(
                 delimited(space0, tag(","), space0),
                 parse_image_op
             ),
@@ -110,43 +108,6 @@ fn parse_array(input: &str) -> IResult<&str, Array> {
         ),
         |v| Array(v)
     )(input)
-}
-
-#[test]
-fn test_parse_single_stage_pipeline() {
-    let pipeline = "circle filled 231 337 100 (255, 255, 0)";
-    let parsed = parse_pipeline(pipeline);
-    match parsed {
-        Err(_) => panic!("Parse should succeed"),
-        Ok((i, v)) => {
-            assert_eq!(i, "");
-            let descriptions: Vec<String> = v.iter().map(|o| format!("{:?}", o)).collect();
-            let expected = vec![
-                String::from(
-                    "Circle { fill: Filled, center: (231, 337), radius: 100, color: Rgb(Rgb([255, 255, 0])) }"
-                )
-            ];
-            assert_eq!(descriptions, expected);
-        }
-    }
-}
-
-#[test]
-fn test_parse_multi_stage_pipeline() {
-    let pipeline = "grid 1 2 > gray > scale 3 > id";
-    let parsed = parse_pipeline(pipeline);
-    match parsed {
-        Err(_) => panic!("Parse should succeed"),
-        Ok((i, v)) => {
-            assert_eq!(i, "");
-            let descriptions: Vec<String> = v.iter().map(|o| format!("{:?}", o)).collect();
-            let expected: Vec<String> = vec!["Grid(1, 2)", "Gray", "Scale(3.0)", "Id"]
-                .into_iter()
-                .map(|s| s.into())
-                .collect();
-            assert_eq!(descriptions, expected);
-        }
-    }
 }
 
 fn usize_(input: &str) -> IResult<&str, usize> {
@@ -324,7 +285,7 @@ fn parse_color(input: &str) -> IResult<&str, Color> {
     map(
         delimited(
             tag("("),
-            separated_list(
+            separated_nonempty_list(
                 delimited(space0, tag(","), space0),
                 uint8
             ),
@@ -351,94 +312,6 @@ fn parse_const(input: &str) -> IResult<&str, Const> {
     let (i, color) = parse_color(i)?;
     let c = Const { width, height, color };
     Ok((i, c))
-}
-
-#[test]
-fn test_parse_circle() {
-    // RGB
-    assert_eq!(
-        parse_circle("circle filled 231 337 100 (255, 255, 0)"),
-        Ok((
-            "",
-            Circle {
-                fill: FillType::Filled,
-                center: (231, 337),
-                radius: 100,
-                color: Color::Rgb(Rgb([255, 255, 0]))
-            }
-        ))
-    );
-}
-
-#[test]
-fn test_parse_hcat() {
-    // No width provided - default to 2
-    assert_eq!(
-        parse_hcat("hcat"),
-        Ok(("", Grid(2, 1)))
-    );
-    // Width provided
-    assert_eq!(
-        parse_hcat("hcat 3"),
-        Ok(("", Grid(3, 1)))
-    );
-}
-
-#[test]
-fn test_parse_scale() {
-    // Literal doesn't match
-    assert_eq!(
-        parse_scale("circle 1 2 3"),
-        Err(nom::Err::Error(("circle 1 2 3", ErrorKind::Tag)))
-    );
-    // No number provided
-    assert_eq!(
-        parse_scale("scale"),
-        Err(nom::Err::Error(("", ErrorKind::Space)))
-    );
-    // Correct incantation, integer literal
-    assert_eq!(
-        parse_scale("scale 3"),
-        Ok(("", Scale(3.0)))
-    );
-    // Correct incantation, floating point literal
-    assert_eq!(
-        parse_scale("scale 3.0"),
-        Ok(("", Scale(3.0)))
-    );
-}
-
-#[test]
-fn test_parse_gray() {
-    // Literal doesn't match
-    assert_eq!(
-        parse_gray("blue"),
-        Err(nom::Err::Error(("blue", ErrorKind::Tag)))
-    );
-    // Literal matches
-    assert_eq!(
-        parse_gray("gray"),
-        Ok(("", Gray))
-    );
-}
-
-#[test]
-fn test_parse_grid() {
-    // Literal doesn't match
-    assert_eq!(
-        parse_grid("circle 1 2 3"),
-        Err(nom::Err::Error(("circle 1 2 3", ErrorKind::Tag)))
-    );
-    // Only one number provided
-    assert_eq!(
-        parse_grid("grid 12"),
-        Err(nom::Err::Error(("", ErrorKind::Space)))
-    );
-    // Correct incantation
-    assert_eq!(
-        parse_grid("grid 12 34"),
-        Ok(("", Grid(12, 34)))
-    );
 }
 
 fn color_from_vals(vals: &[u8]) -> Color {
@@ -858,7 +731,6 @@ fn func(image: &DynamicImage, expr: &Expr) -> DynamicImage {
     }
 }
 
-
 /// User defined per-subpixel function, taking two input images.
 struct Func2 {
     /// The definition provided by the user, to use in logging.
@@ -1096,5 +968,156 @@ fn translate(image: &DynamicImage, tx: i32, ty: i32) -> DynamicImage {
         ImageRgba8(image) => ImageRgba8(translate(image, t)),
         ImageBgr8(image) => ImageBgr8(translate(image, t)),
         ImageBgra8(image) => ImageBgra8(translate(image, t)),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use nom::error::ErrorKind;
+
+    #[test]
+    fn test_parse_valid_single_stage_pipeline() {
+        let pipeline = "circle filled 231 337 100 (255, 255, 0)";
+        let parsed = parse_pipeline(pipeline);
+        match parsed {
+            Err(_) => panic!("Parse should succeed"),
+            Ok((i, v)) => {
+                assert_eq!(i, "");
+                let descriptions: Vec<String> = v.iter().map(|o| format!("{:?}", o)).collect();
+                let expected = vec![
+                    String::from(
+                        "Circle { fill: Filled, center: (231, 337), radius: 100, color: Rgb(Rgb([255, 255, 0])) }"
+                    )
+                ];
+                assert_eq!(descriptions, expected);
+            }
+        }
+    }
+
+    #[test]
+    fn test_parse_invalid_single_stage_pipeline() {
+        let pipeline = "grid 1"; // Not valid, as grid requires two numerical inputs
+        let parsed = parse_pipeline(pipeline);
+        match parsed {
+            Ok((i, v)) => panic!("Parse succeeded, but should have failed. i: {:?}, v: {:?}", i, v),
+            Err(_) => (), // TODO: add error reporting, with tests
+        }
+    }
+
+    #[test]
+    fn test_parse_valid_multi_stage_pipeline() {
+        let pipeline = "grid 1 2 > gray > scale 3 > id";
+        let parsed = parse_pipeline(pipeline);
+        match parsed {
+            Err(_) => panic!("Parse should succeed"),
+            Ok((i, v)) => {
+                assert_eq!(i, "");
+                let descriptions: Vec<String> = v.iter().map(|o| format!("{:?}", o)).collect();
+                let expected: Vec<String> = vec!["Grid(1, 2)", "Gray", "Scale(3.0)", "Id"]
+                    .into_iter()
+                    .map(|s| s.into())
+                    .collect();
+                assert_eq!(descriptions, expected);
+            }
+        }
+    }
+
+    #[test]
+    fn test_parse_invalid_multi_stage_pipeline() {
+        let pipeline = "gray > grid 1 > scale 3 > id"; // The grid stage is invalid
+        let parsed = parse_pipeline(pipeline);
+        match parsed {
+            Ok((i, v)) => panic!("Parse succeeded, but should have failed. i: {:?}, v: {:?}", i, v),
+            Err(_) => (), // TODO: add error reporting, with tests
+        }
+    }
+
+    #[test]
+    fn test_parse_circle() {
+        // RGB
+        assert_eq!(
+            parse_circle("circle filled 231 337 100 (255, 255, 0)"),
+            Ok((
+                "",
+                Circle {
+                    fill: FillType::Filled,
+                    center: (231, 337),
+                    radius: 100,
+                    color: Color::Rgb(Rgb([255, 255, 0]))
+                }
+            ))
+        );
+    }
+
+    #[test]
+    fn test_parse_hcat() {
+        // No width provided - default to 2
+        assert_eq!(
+            parse_hcat("hcat"),
+            Ok(("", Grid(2, 1)))
+        );
+        // Width provided
+        assert_eq!(
+            parse_hcat("hcat 3"),
+            Ok(("", Grid(3, 1)))
+        );
+    }
+
+    #[test]
+    fn test_parse_scale() {
+        // Literal doesn't match
+        assert_eq!(
+            parse_scale("circle 1 2 3"),
+            Err(nom::Err::Error(("circle 1 2 3", ErrorKind::Tag)))
+        );
+        // No number provided
+        assert_eq!(
+            parse_scale("scale"),
+            Err(nom::Err::Error(("", ErrorKind::Space)))
+        );
+        // Correct incantation, integer literal
+        assert_eq!(
+            parse_scale("scale 3"),
+            Ok(("", Scale(3.0)))
+        );
+        // Correct incantation, floating point literal
+        assert_eq!(
+            parse_scale("scale 3.0"),
+            Ok(("", Scale(3.0)))
+        );
+    }
+
+    #[test]
+    fn test_parse_gray() {
+        // Literal doesn't match
+        assert_eq!(
+            parse_gray("blue"),
+            Err(nom::Err::Error(("blue", ErrorKind::Tag)))
+        );
+        // Literal matches
+        assert_eq!(
+            parse_gray("gray"),
+            Ok(("", Gray))
+        );
+    }
+
+    #[test]
+    fn test_parse_grid() {
+        // Literal doesn't match
+        assert_eq!(
+            parse_grid("circle 1 2 3"),
+            Err(nom::Err::Error(("circle 1 2 3", ErrorKind::Tag)))
+        );
+        // Only one number provided
+        assert_eq!(
+            parse_grid("grid 12"),
+            Err(nom::Err::Error(("", ErrorKind::Space)))
+        );
+        // Correct incantation
+        assert_eq!(
+            parse_grid("grid 12 34"),
+            Ok(("", Grid(12, 34)))
+        );
     }
 }

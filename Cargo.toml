@@ -10,3 +10,4 @@ imageproc = { path = "../imageproc" }
 structopt = "0.3"
 clap = "2.33.0"
 nom = "5.0.1"
+rusttype = "0.7"

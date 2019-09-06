@@ -98,11 +98,11 @@ use nom::{
     error::ErrorKind,
     branch::alt,
     bytes::complete::{tag, tag_no_case},
-    combinator::{map, map_res},
+    combinator::{map, map_res, opt},
     character::complete::{digit1, space0, space1},
     multi::{many1, separated_list},
     number::complete::float,
-    sequence::{delimited, pair, tuple}
+    sequence::{delimited, pair, tuple, preceded}
 };
 
 // TODO: Should we reject e.g. three numbers for Grid in the stage parsers or the pipeline parser.
@@ -162,40 +162,125 @@ fn parse_connector(input: &str) -> IResult<&str, ()> {
     Ok((i, ()))
 }
 
+// TODO: Remaining image ops that need parsers. Also need to get rid of the
+// TODO: distinction between image and stack ops - they can all just implement the same trait.
+//
+// Array is handled specially
+// "func" => Some(Box::new(parse_func(op))),
+// "func2" => Some(Box::new(parse_func2(op))),
+// "const" => Some(Box::new(parse_const(op))),
+// "circle" => Some(Box::new(parse_circle(op))),
+
+fn uint32(input: &str) -> IResult<&str, u32> {
+    map_res(digit1, |s: &str| s.parse::<u32>())(input)
+}
+
+fn int32(input: &str) -> IResult<&str, i32> {
+    map_res(digit1, |s: &str| s.parse::<i32>())(input)
+}
+
 // 'grid 12 34' -> Grid(12, 34)
 fn parse_grid(input: &str) -> IResult<&str, Grid> {
     let (i, _) = tag_no_case("grid")(input)?;
-    let (i, _) = space1(i)?;
-    let (i, width) = map_res(digit1, |s: &str| s.parse::<u32>())(i)?;
-    let (i, _) = space1(i)?;
-    let (i, height) = map_res(digit1, |s: &str| s.parse::<u32>())(i)?;
-    Ok((i, Grid(width, height)))
+    let (i, (w, h)) = pair(preceded(space1, uint32), preceded(space1, uint32))(i)?;
+    Ok((i, Grid(w, h)))
 }
 
-// 'gray' -> Gray
-fn parse_gray(input: &str) -> IResult<&str, Gray> {
-    map(tag_no_case("gray"), |_| Gray)(input)
+// TODO: don't duplicate parse_grid
+// 'median 12 34' -> Median(12, 34)
+fn parse_median(input: &str) -> IResult<&str, Median> {
+    let (i, _) = tag_no_case("median")(input)?;
+    let (i, (rx, ry)) = pair(preceded(space1, uint32), preceded(space1, uint32))(i)?;
+    Ok((i, Median(rx, ry)))
 }
 
-// 'id' -> Id
-fn parse_id(input: &str) -> IResult<&str, Id> {
-    map(tag_no_case("id"), |_| Id)(input)
+// 'translate 10 20' -> Translate(10, 20)
+fn parse_translate(input: &str) -> IResult<&str, Translate> {
+    let (i, _) = tag_no_case("translate")(input)?;
+    let (i, (tx, ty)) = pair(preceded(space1, int32), preceded(space1, int32))(i)?;
+    Ok((i, Translate(tx, ty)))
 }
+
+/// Generates parsers which match a literal and return a struct of the specific field-less type.
+macro_rules! named_empty_struct_parsers {
+    ($( $parser_name:ident, $name:expr, $type:ident );* $(;)? )  => {
+        $(
+            fn $parser_name(input: &str) -> IResult<&str, $type> {
+                map(tag_no_case($name), |_| $type)(input)
+            }
+        )*
+    }
+}
+
+named_empty_struct_parsers!(
+    parse_gray, "gray", Gray;
+    parse_id, "id", Id;
+    parse_red, "red", Red;
+    parse_green, "green", Green;
+    parse_blue, "blue", Blue;
+    parse_sobel, "sobel", Sobel;
+    parse_othresh, "othresh", OtsuThreshold;
+);
 
 // 'scale 12' -> Scale(12.0)
 fn parse_scale(input: &str) -> IResult<&str, Scale> {
-    let (i, _) = tag_no_case("scale")(input)?;
+    parse_single_float_tuple_struct(input, "scale", |x| Scale(x))
+}
+
+// 'gaussian 12' -> Gaussian(12.0)
+fn parse_gaussian(input: &str) -> IResult<&str, Gaussian> {
+    parse_single_float_tuple_struct(input, "gaussian", |x| Gaussian(x))
+}
+
+// 'rotate 45' -> Rotate(45.0)
+fn parse_rotate(input: &str) -> IResult<&str, Rotate> {
+    parse_single_float_tuple_struct(input, "rotate", |x| Rotate(x))
+}
+
+// 'carve 0.85' -> Carve(0.85)
+fn parse_carve(input: &str) -> IResult<&str, Carve> {
+    parse_single_float_tuple_struct(input, "carve", |x| Carve(x))
+}
+
+// 'athresh 12' -> AdaptiveThreshold(12)
+fn parse_adaptive_threshold(input: &str) -> IResult<&str, AdaptiveThreshold> {
+    let (i, _) = tag_no_case("athresh")(input)?;
     let (i, _) = space1(i)?;
-    let (i, scale) = float(i)?;
-    Ok((i, Scale(scale)))
+    let (i, radius) = map_res(digit1, |s: &str| s.parse::<u32>())(i)?;
+    Ok((i, AdaptiveThreshold(radius)))
+}
+
+fn parse_single_float_tuple_struct<'a, 'b, T, F>(
+    input: &'a str,
+    name: &'b str, f: F
+) -> IResult<&'a str, T>
+where
+    F: Fn(f32) -> T
+{
+    let (i, _) = tag_no_case(name)(input)?;
+    let (i, _) = space1(i)?;
+    let (i, val) = float(i)?;
+    Ok((i, f(val)))
+}
+
+fn opt_space_then_u32(input: &str) -> IResult<&str, Option<u32>> {
+    opt(preceded(space1, uint32))(input)
 }
 
 // 'hcat' -> Grid 2 1
 // 'hcat 3' -> Grid 3 1
 fn parse_hcat(input: &str) -> IResult<&str, Grid> {
-    // TODO: handle specified width. use nom::combinator::opt
     let (i, _) = tag_no_case("hcat")(input)?;
-    Ok((i, Grid(2, 1)))
+    let (i, w) = opt_space_then_u32(i)?;
+    Ok((i, Grid(w.unwrap_or(2), 1)))
+}
+
+// 'vcat' -> Grid 1 2
+// 'vcat 3' -> Grid 1 3
+fn parse_vcat(input: &str) -> IResult<&str, Grid> {
+    let (i, _) = tag_no_case("vcat")(input)?;
+    let (i, h) = opt_space_then_u32(i)?;
+    Ok((i, Grid(1, h.unwrap_or(2))))
 }
 
 #[test]
@@ -206,11 +291,10 @@ fn test_parse_hcat() {
         Ok(("", Grid(2, 1)))
     );
     // Width provided
-    // TODO
-    // assert_eq!(
-    //     parse_hcat("hcat 3"),
-    //     Ok(("", Grid(3, 1)))
-    // );
+    assert_eq!(
+        parse_hcat("hcat 3"),
+        Ok(("", Grid(3, 1)))
+    );
 }
 
 #[test]

@@ -48,13 +48,6 @@ impl<T: Clone> Stack<T> {
         self.contents.insert(self.len() - (n - 1), a);
     }
 
-    /// over ( a b -- a b a )
-    pub fn over(&mut self) {
-        self.assert_stack_size("over", 2);
-        let a = self.contents[self.len() - 1].clone();
-        self.contents.insert(self.len() - 2, a);
-    }
-
     /// pops the top of the stack.
     pub fn pop(&mut self) -> T {
         self.assert_stack_size("pop", 1);

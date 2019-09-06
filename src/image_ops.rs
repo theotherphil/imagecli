@@ -7,34 +7,6 @@ use imageproc::definitions::Clamp;
 use crate::expr::Expr;
 use std::cmp;
 use crate::ImageStack;
-use crate::stack_ops::StackOp;
-
-/// A pipeline operation - either a direct manipulation of the stack,
-/// or an image operation which reads from and writes to the top of the stack.
-#[derive(Debug)]
-pub enum Op {
-    StackOp(StackOp),
-    ImageOp(Box<dyn ImageOp>),
-}
-
-impl Op {
-    pub fn parse(op: &str) -> Option<Op> {
-        match StackOp::parse(op) {
-            Some(o) => Some(Op::StackOp(o)),
-            None => match parse(op) {
-                Some(o) => Some(Op::ImageOp(o)),
-                None => None,
-            }
-        }
-    }
-
-    pub fn apply(&self, stack: &mut ImageStack) {
-        match self {
-            Op::StackOp(s) => s.apply(stack),
-            Op::ImageOp(o) => o.apply(stack),
-        }
-    }
-}
 
 /// An image processing operation that operates on a stack of images.
 pub trait ImageOp : std::fmt::Debug {
@@ -60,6 +32,22 @@ pub fn parse(op: &str) -> Option<Box<dyn ImageOp>> {
     }
     let split: Vec<&str> = op.split_whitespace().collect();
     match split[0] {
+        "DUP" => {
+            if split.len() == 1 {
+                Some(Box::new(Dup(1)))
+            } else {
+                Some(Box::new(Dup(split[1].parse().unwrap())))
+            }
+        },
+        "DROP" => Some(Box::new(Drop)),
+        "SWAP" => Some(Box::new(Rot(2))),
+        "ROT" => {
+            if split.len() == 1 {
+                Some(Box::new(Rot(3)))
+            } else {
+                Some(Box::new(Rot(split[1].parse().unwrap())))
+            }
+        },
         "scale" => Some(Box::new(Scale(split[1].parse().unwrap()))),
         "gaussian" => Some(Box::new(Gaussian(split[1].parse().unwrap()))),
         "gray" => Some(Box::new(Gray)),
@@ -426,6 +414,36 @@ where
     let image = stack.pop();
     let result = f(&image);
     stack.push(result);
+}
+
+/// Duplicates the top element of the stack n times.
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+struct Dup(usize);
+
+impl ImageOp for Dup {
+    fn apply(&self, stack: &mut ImageStack) {
+        stack.dup(self.0);
+    }
+}
+
+/// Discards the top element of the stack.
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+struct Drop;
+
+impl ImageOp for Drop {
+    fn apply(&self, stack: &mut ImageStack) {
+        stack.drop();
+    }
+}
+
+/// Rotates the top n elements of the stack by 1.
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+struct Rot(usize);
+
+impl ImageOp for Rot {
+    fn apply(&self, stack: &mut ImageStack) {
+        stack.rot(self.0);
+    }
 }
 
 /// Scale both width and height by given multiplier.

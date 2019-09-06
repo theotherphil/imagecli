@@ -24,6 +24,9 @@ pub trait ImageOp : std::fmt::Debug {
     fn apply(&self, stack: &mut ImageStack);
 }
 
+// TODO:
+// - if the pipeline consists of a single malformed stage then it just gets ignored without errors
+// - if the pipeline contains a dodgy stage then we just skip the rest without erroring
 pub fn parse(pipeline: &str) -> Vec<Box<dyn ImageOp>> {
     let pipeline = parse_pipeline(pipeline);
     match pipeline {
@@ -449,21 +452,13 @@ fn color_from_vals(vals: &[u8]) -> Color {
 }
 
 fn parse_func(input: &str) -> IResult<&str, Func> {
-    // TODO!
-    Err(nom::Err::Error(("circle 1 2 3", ErrorKind::Tag)))
-    // Func {
-    //     text: func.into(),
-    //     expr: crate::expr::parse_func(&func[5..]),
-    // }
+    let (i, (text, expr)) = crate::expr::parse_func(input, "func")?;
+    Ok((i, Func { text, expr }))
 }
 
 fn parse_func2(input: &str) -> IResult<&str, Func2> {
-    // TODO!
-    Err(nom::Err::Error(("circle 1 2 3", ErrorKind::Tag)))
-    // Func2 {
-    //     text: func.into(),
-    //     expr: crate::expr::parse_func(&func[6..]),
-    // }
+    let (i, (text, expr)) = crate::expr::parse_func(input, "func2")?;
+    Ok((i, Func2 { text, expr }))
 }
 
 fn one_in_one_out<F>(stack: &mut ImageStack, f: F)

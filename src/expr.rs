@@ -1,7 +1,19 @@
 
-pub fn parse_func(body: &str) -> Expr {
-    let tokens = tokenise(body);
-    parse_expr(&tokens)
+use nom::{
+    IResult,
+    branch::alt,
+    bytes::complete::tag,
+    combinator::map,
+    character::complete::{alpha1, space0},
+    multi::many0,
+    number::complete::float,
+    sequence::{delimited, pair, preceded},
+};
+
+pub fn parse_func<'a, 'b>(input: &'a str, name: &'b str) -> IResult<&'a str, (String, Expr)> {
+    let (i, tokens) = lex(input, name)?;
+    let body: Vec<String> = tokens.iter().map(|t| t.to_string()).collect();
+    Ok((i, (body.join(" "), parse_expr(&tokens))))
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -53,99 +65,54 @@ enum Token {
     CloseParen,
 }
 
-struct Lexer {
-    text: Vec<char>,
-    position: usize,
-}
-
-impl Lexer {
-    fn new(text: &str) -> Self {
-        Lexer {
-            text: text.chars().collect(),
-            position: 0,
-        }
-    }
-
-    fn current(&self) -> Option<char> {
-        if self.position == self.text.len() {
-            None
-        } else {
-            Some(self.text[self.position])
-        }
+impl std::fmt::Display for Token {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            Token::Var(v) => v.clone(),
+            Token::Func(b) => b.clone(),
+            Token::Num(n) => n.to_string(),
+            Token::Plus => "+".into(),
+            Token::Sub => "-".into(),
+            Token::Mul => "*".into(),
+            Token::Div => "/".into(),
+            Token::Pow => "^".into(),
+            Token::OpenParen => "(".into(),
+            Token::CloseParen => ")".into(),
+        };
+        write!(f, "{}", s)
     }
 }
 
-fn is_op_or_paren(c: char) -> bool {
-    match c {
-        '+' | '-' | '*' | '/' | '^' | '(' | ')' => true,
-        _ => false
-    }
+fn token(input: &str) -> IResult<&str, Token> {
+    // TODO: handle named functions
+    alt((
+        map(tag("+"), |_| Token::Plus),
+        map(tag("-"), |_| Token::Sub),
+        map(tag("*"), |_| Token::Mul),
+        map(tag("/"), |_| Token::Div),
+        map(tag("^"), |_| Token::Pow),
+        map(tag("("), |_| Token::OpenParen),
+        map(tag(")"), |_| Token::CloseParen),
+        map(alpha1, |n: &str| Token::Var(n.into())),
+        map(float, |f| Token::Num(f)),
+    ))(input)
 }
 
-impl Iterator for Lexer {
-    type Item = Token;
-
-    fn next(&mut self) -> Option<Token> {
-        while self.current().is_some() && self.current().unwrap().is_whitespace() {
-            self.position += 1;
-        }
-        if self.current().is_none() {
-            return None;
-        }
-        let current = self.current().unwrap();
-        if current == '(' {
-            self.position += 1;
-            return Some(Token::OpenParen);
-        }
-        if current == ')' {
-            self.position += 1;
-            return Some(Token::CloseParen);
-        }
-        if current == '+' {
-            self.position += 1;
-            return Some(Token::Plus);
-        }
-        if current == '-' {
-            self.position += 1;
-            return Some(Token::Sub);
-        }
-        if current == '*' {
-            self.position += 1;
-            return Some(Token::Mul);
-        }
-        if current == '/' {
-            self.position += 1;
-            return Some(Token::Div);
-        }
-        if current == '^' {
-            self.position += 1;
-            return Some(Token::Pow);
-        }
-        // TODO: handle named functions
-        if current.is_alphabetic() {
-            let mut var = vec![];
-            while self.current().is_some() && self.current().unwrap().is_alphabetic() {
-                var.push(self.current().unwrap());
-                self.position += 1;
-            }
-            return Some(Token::Var(var.iter().collect()))
-        }
-        let mut num = vec![];
-        while self.current().is_some()
-            && !self.current().unwrap().is_whitespace()
-            && !is_op_or_paren(self.current().unwrap())
-        {
-            num.push(self.current().unwrap());
-            self.position += 1;
-        }
-        let num: String = num.iter().collect();
-        Some(Token::Num(num.parse().unwrap()))
-    }
-}
-
-fn tokenise(func: &str) -> Vec<Token> {
-    let lexer = Lexer::new(func);
-    lexer.collect()
+// Creates tokens from a func definition.
+// 'func { .. }'
+fn lex<'a, 'b>(input: &'a str, name: &'b str) -> IResult<&'a str, Vec<Token>> {
+    preceded(
+        pair(tag(name), space0),
+        delimited(
+            tag("{"),
+            delimited(
+                space0,
+                // separated_list(space0, token) does not work here
+                many0(preceded(space0, token)),
+                space0),
+            tag("}"),
+        )
+    )(input)
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -323,11 +290,32 @@ mod tests {
     }
 
     #[test]
-    fn test_tokenise() {
-        let text = "3 + 4 * 2 / (1 - 5) ^ 2";
+    fn test_lex() {
         assert_eq!(
-            tokenise(text),
-            tokens!["3", "+", "4", "*", "2", "/", "(", "1", "-", "5", ")", "^", "2"]
+            lex("func { p + x / 5 + y / 5 }", "func"),
+            Ok(("", vec![
+                Token::Var("p".into()),
+                Token::Plus,
+                Token::Var("x".into()),
+                Token::Div,
+                Token::Num(5.0),
+                Token::Plus,
+                Token::Var("y".into()),
+                Token::Div,
+                Token::Num(5.0),
+            ]))
+        );
+        assert_eq!(
+            lex("func2 { (p + q) / 2 }", "func2"),
+            Ok(("", vec![
+                Token::OpenParen,
+                Token::Var("p".into()),
+                Token::Plus,
+                Token::Var("q".into()),
+                Token::CloseParen,
+                Token::Div,
+                Token::Num(2.0),
+            ])),
         );
     }
 

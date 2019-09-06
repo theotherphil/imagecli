@@ -79,7 +79,7 @@ cargo run --release -- -v -i images/robin.jpg -o images/12.png -p 'scale 0.5 > D
 <img src="images/12.png" alt="Output"/>
 
 <pre>
-cargo run --release -- -v -i images/robin.jpg -o images/13.png -p 'func (p + x / 5 + y / 5)'
+cargo run --release -- -v -i images/robin.jpg -o images/13.png -p 'func { p + x / 5 + y / 5 }'
 </pre>
 
 <img src="images/13.png" alt="Output"/>
@@ -97,7 +97,7 @@ cargo run --release -- -v -i images/robin.jpg -o images/15.png -p 'circle filled
 <img src="images/15.png" alt="Output"/>
 
 <pre>
-cargo run --release -- -v -i images/robin.jpg -o images/16.png -p 'DUP 2 > const 462 674 (255, 255, 0) > DUP > ROT 3 > func2 (p + q) / 2 > ROT 3 > hcat 3'
+cargo run --release -- -v -i images/robin.jpg -o images/16.png -p 'DUP 2 > const 462 674 (255, 255, 0) > DUP > ROT 3 > func2 { (p + q) / 2 } > ROT 3 > hcat 3'
 </pre>
 
 <img src="images/16.png" alt="Output"/>

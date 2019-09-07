@@ -345,7 +345,16 @@ struct Gray;
 
 impl ImageOp for Gray {
     fn apply(&self, stack: &mut ImageStack) {
-        one_in_one_out(stack, |i| i.grayscale());
+        let image = stack.pop();
+        let result = gray(image);
+        stack.push(result);
+    }
+}
+
+fn gray(image: DynamicImage) -> DynamicImage {
+    match image {
+        ImageLuma8(i) => ImageLuma8(i),
+        _ => image.grayscale(),
     }
 }
 
@@ -464,14 +473,21 @@ struct OtsuThreshold;
 
 impl ImageOp for OtsuThreshold {
     fn apply(&self, stack: &mut ImageStack) {
-        one_in_one_out(stack, otsu_threshold);
+        let image = stack.pop();
+        let result = otsu_threshold(image);
+        stack.push(result);
     }
 }
 
-fn otsu_threshold(image: &DynamicImage) -> DynamicImage {
-    use imageproc::contrast::{otsu_level, threshold};
-    let gray = image.to_luma();
-    ImageLuma8(threshold(&gray, otsu_level(&gray)))
+fn otsu_threshold(image: DynamicImage) -> DynamicImage {
+    use imageproc::contrast::{otsu_level, threshold_mut};
+    let mut image = match gray(image) {
+        ImageLuma8(i) => i,
+        _ => unreachable!(),
+    };
+    let level = otsu_level(&image);
+    threshold_mut(&mut image, level);
+    ImageLuma8(image)
 }
 
 /// Arrange images into a grid. First argument is the number of columns and second the number of rows.
@@ -1001,7 +1017,7 @@ mod tests {
     fn bench_run_pipeline_with_user_defined_func(b: &mut Bencher) {
         let pipeline = "func { 255 * (p > 100) }";
         let image = DynamicImage::ImageLuma8(
-            ImageBuffer::from_fn(40, 40, |x, y| Luma([(x + y) as u8]))
+            ImageBuffer::from_fn(100, 100, |x, y| Luma([(x + y) as u8]))
         );
         b.iter(|| {
             let inputs = black_box(vec![image.clone()]);
@@ -1011,9 +1027,9 @@ mod tests {
 
     #[bench]
     fn bench_run_pipeline(b: &mut Bencher) {
-        let pipeline = "gray > DUP > ROT 2 > rotate 45 > othresh > scale 2";
+        let pipeline = "gray > DUP > rotate 45 > ROT 2 > othresh > hcat";
         let image = DynamicImage::ImageLuma8(
-            ImageBuffer::from_fn(40, 40, |x, y| Luma([(x + y) as u8]))
+            ImageBuffer::from_fn(100, 100, |x, y| Luma([(x + y) as u8]))
         );
         b.iter(|| {
             let inputs = black_box(vec![image.clone()]);

@@ -844,28 +844,27 @@ struct Circle {
 
 impl ImageOp for Circle {
     fn apply(&self, stack: &mut ImageStack) {
-        one_in_one_out(stack, |i| draw_circle(i, self));
+        let image = stack.pop();
+        let result = draw_circle(image, self);
+        stack.push(result);
     }
 }
 
-// TODO: if we always pass the op type itself then we can standardise the calls to one_in_one_out across all ops.
-fn draw_circle(image: &DynamicImage, circle: &Circle) -> DynamicImage {
-    use imageproc::drawing::{draw_hollow_circle, draw_filled_circle};
+fn draw_circle(image: DynamicImage, circle: &Circle) -> DynamicImage {
+    use imageproc::drawing::{draw_hollow_circle_mut, draw_filled_circle_mut};
     // TODO: Handle formats properly - choose the "most general" color space.
-    let image = image.to_rgba();
+    let mut image = image.to_rgba();
     let color = match circle.color {
         Color::Luma(c) => c.to_rgba(),
         Color::LumaA(c) => c.to_rgba(),
         Color::Rgb(c) => c.to_rgba(),
         Color::Rgba(c) => c.to_rgba(),
     };
-
-    // TODO: We always consume entries from the stack, so we using mutating functions where
-    // TODO: possible, rather than just constantly allocating new images.
     match circle.fill {
-        FillType::Filled => ImageRgba8(draw_filled_circle(&image, circle.center, circle.radius, color)),
-        FillType::Hollow => ImageRgba8(draw_hollow_circle(&image, circle.center, circle.radius, color)),
-    }
+        FillType::Filled => draw_filled_circle_mut(&mut image, circle.center, circle.radius, color),
+        FillType::Hollow => draw_hollow_circle_mut(&mut image, circle.center, circle.radius, color),
+    };
+    ImageRgba8(image)
 }
 
 /// Translate the image.

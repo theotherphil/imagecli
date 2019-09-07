@@ -7,14 +7,13 @@ use imageproc::definitions::Clamp;
 use crate::expr::Expr;
 use std::cmp;
 use crate::ImageStack;
-use crate::parse_utils::{op_zero, op_one, op_one_opt, op_two, int};
+use crate::parse_utils::{op_zero, op_one, op_one_opt, op_two, int, nonempty_sequence};
 use nom::{
     IResult,
     branch::alt,
     bytes::complete::tag,
     combinator::{all_consuming, map},
-    character::complete::{space0, space1},
-    multi::separated_nonempty_list,
+    character::complete::{space1},
     number::complete::float,
     sequence::{delimited, pair, preceded, tuple}
 };
@@ -65,24 +64,10 @@ The error is likely near the start of the remaining (unparsed) text.
 }
 
 fn parse_pipeline(input: &str) -> IResult<&str, Vec<Box<dyn ImageOp>>> {
-    all_consuming(
-        separated_nonempty_list(parse_connector, parse_image_op)
-    )(input)
+    all_consuming(nonempty_sequence(">", parse_image_op))(input)
 }
 
-fn parse_connector(input: &str) -> IResult<&str, ()> {
-    delimited(space0, map(tag(">"), |_| ()), space0)(input)
-}
-
-/// I wanted to write this as a function, but got confused by the resulting compiler errors.
-macro_rules! map_box {
-    ($parser:expr) => {
-        map($parser, |o| {
-            let boxed: Box<dyn ImageOp> = Box::new(o);
-            boxed
-        })
-    }
-}
+macro_rules! map_box { ($parser:expr) => { $crate::map_to_boxed_trait!($parser, ImageOp) } }
 
 fn parse_image_op(input: &str) -> IResult<&str, Box<dyn ImageOp>> {
     // Nested alts are required because alt only supports tuples with up 21 elements.
@@ -122,19 +107,11 @@ fn parse_image_op(input: &str) -> IResult<&str, Box<dyn ImageOp>> {
 
 fn parse_array(input: &str) -> IResult<&str, Array> {
     map(
-        delimited(
-            tag("["),
-            separated_nonempty_list(
-                delimited(space0, tag(","), space0),
-                parse_image_op
-            ),
-            tag("]")
-        ),
+        delimited(tag("["), nonempty_sequence(",", parse_image_op), tag("]")),
         |v| Array(v)
     )(input)
 }
 
-// TODO: Remove duplication between this and parse_const
 // circle filltype cx cy radius (color)
 // Uses the same colour format as const
 fn parse_circle(input: &str) -> IResult<&str, Circle> {
@@ -154,14 +131,7 @@ fn parse_circle(input: &str) -> IResult<&str, Circle> {
 
 fn parse_color(input: &str) -> IResult<&str, Color> {
     map(
-        delimited(
-            tag("("),
-            separated_nonempty_list(
-                delimited(space0, tag(","), space0),
-                int::<u8>
-            ),
-            tag(")")
-        ),
+        delimited(tag("("), nonempty_sequence(",", int::<u8>), tag(")")),
         |vs| color_from_vals(&vs)
     )(input)
 }

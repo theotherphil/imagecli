@@ -3,9 +3,35 @@ use nom::{
     IResult,
     bytes::complete::tag,
     combinator::{map, map_res, opt},
-    character::complete::{digit1, space1},
-    sequence::{preceded, tuple},
+    character::complete::{digit1, space0, space1},
+    multi::separated_nonempty_list,
+    sequence::{delimited, preceded, tuple},
 };
+
+/// Converts a parser that returns a T: SomeTrait to one that returns a Box<dyn SomeTrait>.
+#[macro_export]
+macro_rules! map_to_boxed_trait {
+    ($parser:expr, $trait:ident) => {
+        map($parser, |o| {
+            let boxed: Box<dyn $trait> = Box::new(o);
+            boxed
+        })
+    }
+}
+
+/// Parses a nonempty separated list where the separator can be padded with arbitrary whitespace.
+pub fn nonempty_sequence<'a, T, F>(
+    separator: &'static str,
+    element: F
+) -> impl Fn(&'a str) -> IResult<&'a str, Vec<T>>
+where
+    F: Fn(&'a str) -> IResult<&'a str, T>
+{
+    separated_nonempty_list(
+        delimited(space0, tag(separator), space0),
+        element
+    )
+}
 
 /// Parses a integer value.
 pub fn int<T: std::str::FromStr>(input: &str) -> IResult<&str, T> {
@@ -30,7 +56,7 @@ where
     move |i| map(
         preceded(
             tag(name),
-            preceded(space1, arg1)
+            preceded(space1, arg1),
         ),
         |val| build(val)
     )(i)

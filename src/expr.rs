@@ -53,31 +53,28 @@ impl Expr {
 enum Token {
     /// A named variable.
     Var(String),
-    /// A named function.
-    Func(String),
     Num(f32),
-    Plus,
+    Add,
     Sub,
     Mul,
     Div,
-    Pow,
-    OpenParen,
-    CloseParen,
+    Exp,
+    LParen,
+    RParen,
 }
 
 impl std::fmt::Display for Token {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = match self {
             Token::Var(v) => v.clone(),
-            Token::Func(b) => b.clone(),
             Token::Num(n) => n.to_string(),
-            Token::Plus => "+".into(),
+            Token::Add => "+".into(),
             Token::Sub => "-".into(),
             Token::Mul => "*".into(),
             Token::Div => "/".into(),
-            Token::Pow => "^".into(),
-            Token::OpenParen => "(".into(),
-            Token::CloseParen => ")".into(),
+            Token::Exp => "^".into(),
+            Token::LParen => "(".into(),
+            Token::RParen => ")".into(),
         };
         write!(f, "{}", s)
     }
@@ -86,13 +83,13 @@ impl std::fmt::Display for Token {
 fn token(input: &str) -> IResult<&str, Token> {
     // TODO: handle named functions
     alt((
-        map(tag("+"), |_| Token::Plus),
+        map(tag("+"), |_| Token::Add),
         map(tag("-"), |_| Token::Sub),
         map(tag("*"), |_| Token::Mul),
         map(tag("/"), |_| Token::Div),
-        map(tag("^"), |_| Token::Pow),
-        map(tag("("), |_| Token::OpenParen),
-        map(tag(")"), |_| Token::CloseParen),
+        map(tag("^"), |_| Token::Exp),
+        map(tag("("), |_| Token::LParen),
+        map(tag(")"), |_| Token::RParen),
         map(alpha1, |n: &str| Token::Var(n.into())),
         map(float, |f| Token::Num(f)),
     ))(input)
@@ -120,11 +117,11 @@ enum Associativity { Right, Left }
 
 fn precedence(token: &Token) -> u32 {
     match token {
-        Token::Plus => 2,
+        Token::Add => 2,
         Token::Sub => 2,
         Token::Mul => 3,
         Token::Div => 3,
-        Token::Pow => 4,
+        Token::Exp => 4,
         // TODO: introduce a new enum for just the tokens?
         _ => panic!("Not an operator"),
     }
@@ -132,11 +129,11 @@ fn precedence(token: &Token) -> u32 {
 
 fn associativity(token: &Token) -> Associativity {
     match token {
-        Token::Plus => Associativity::Left,
+        Token::Add => Associativity::Left,
         Token::Sub => Associativity::Left,
         Token::Mul => Associativity::Left,
         Token::Div => Associativity::Left,
-        Token::Pow => Associativity::Right,
+        Token::Exp => Associativity::Right,
         // TODO: introduce a new enum for just the tokens?
         _ => panic!("Not an operator"),
     }
@@ -144,33 +141,26 @@ fn associativity(token: &Token) -> Associativity {
 
 fn arithmetic_op(token: &Token) -> ArithmeticOp {
     match token {
-        Token::Plus => ArithmeticOp::Add,
+        Token::Add => ArithmeticOp::Add,
         Token::Sub => ArithmeticOp::Sub,
         Token::Mul => ArithmeticOp::Mul,
         Token::Div => ArithmeticOp::Div,
-        Token::Pow => ArithmeticOp::Exp,
+        Token::Exp => ArithmeticOp::Exp,
         // TODO: introduce a new enum for just the tokens?
         _ => panic!("Not an arithmetic operator"),
     }
 }
 
-fn is_function(token: &Token) -> bool {
-    match token {
-        Token::Func(_) => true,
-        _ => false,
-    }
-}
-
 fn is_lparen(token: &Token) -> bool {
     match token {
-        Token::OpenParen => true,
+        Token::LParen => true,
         _ => false,
     }
 }
 
 fn is_operator(token: &Token) -> bool {
     match token {
-        Token::Plus | Token::Sub | Token::Mul | Token::Div | Token::Pow => true,
+        Token::Add | Token::Sub | Token::Mul | Token::Div | Token::Exp => true,
         _ => false,
     }
 }
@@ -190,17 +180,13 @@ fn parse_expr(tokens: &[Token]) -> Expr {
         match token {
             Token::Num(n) => output_queue.push(Expr::Num(*n)),
             Token::Var(v) => output_queue.push(Expr::Var(v.clone())),
-            // TODO
-            //Token::Func(_) => operator_stack.push(token.clone()),
-            Token::Func(_) => panic!("Functions are not yet supported"),
-            Token::Plus | Token::Sub | Token::Mul | Token::Div | Token::Pow => {
+            Token::Add | Token::Sub | Token::Mul | Token::Div | Token::Exp => {
                 loop {
                     if operator_stack.is_empty() {
                         break;
                     }
                     let top = &operator_stack[operator_stack.len() - 1];
-                    if is_function(top)
-                        || (is_operator(top) && precedence(top) > precedence(token))
+                    if (is_operator(top) && precedence(top) > precedence(token))
                         || (is_operator(top) && precedence(top) == precedence(token) && associativity(top) == Associativity::Left)
                     {
                         let top = operator_stack.pop().unwrap();
@@ -211,8 +197,8 @@ fn parse_expr(tokens: &[Token]) -> Expr {
                 }
                 operator_stack.push(token.clone())
             },
-            Token::OpenParen => operator_stack.push(token.clone()),
-            Token::CloseParen => {
+            Token::LParen => operator_stack.push(token.clone()),
+            Token::RParen => {
                 let mut matched = false;
                 loop {
                     if operator_stack.is_empty() {
@@ -278,13 +264,13 @@ mod tests {
             return Token::Num(n);
         }
         match t {
-            "(" => Token::OpenParen,
-            ")" => Token::CloseParen,
-            "+" => Token::Plus,
+            "(" => Token::LParen,
+            ")" => Token::RParen,
+            "+" => Token::Add,
             "-" => Token::Sub,
             "*" => Token::Mul,
             "/" => Token::Div,
-            "^" => Token::Pow,
+            "^" => Token::Exp,
             _ => Token::Var(t.into())
         }
     }
@@ -295,11 +281,11 @@ mod tests {
             lex("func { p + x / 5 + y / 5 }", "func"),
             Ok(("", vec![
                 Token::Var("p".into()),
-                Token::Plus,
+                Token::Add,
                 Token::Var("x".into()),
                 Token::Div,
                 Token::Num(5.0),
-                Token::Plus,
+                Token::Add,
                 Token::Var("y".into()),
                 Token::Div,
                 Token::Num(5.0),
@@ -308,11 +294,11 @@ mod tests {
         assert_eq!(
             lex("func2 { (p + q) / 2 }", "func2"),
             Ok(("", vec![
-                Token::OpenParen,
+                Token::LParen,
                 Token::Var("p".into()),
-                Token::Plus,
+                Token::Add,
                 Token::Var("q".into()),
-                Token::CloseParen,
+                Token::RParen,
                 Token::Div,
                 Token::Num(2.0),
             ])),

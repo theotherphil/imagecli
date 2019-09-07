@@ -89,7 +89,6 @@ fn parse_image_op(input: &str) -> IResult<&str, Box<dyn ImageOp>> {
     ))(input)
 }
 
-// TODO: remove duplication between this and parse_pipeline
 fn parse_array(input: &str) -> IResult<&str, Array> {
     map(
         delimited(
@@ -768,43 +767,12 @@ struct Const {
     color: Color,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-enum ColorSpace {
-    Luma, LumaA, Rgb, Rgba, Bgr, Bgra
-}
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Color {
     Luma(Luma<u8>),
     LumaA(LumaA<u8>),
     Rgb(Rgb<u8>),
     Rgba(Rgba<u8>),
-    Bgr(Bgr<u8>),
-    Bgra(Bgra<u8>),
-}
-
-impl Color {
-    fn color_space(&self) -> ColorSpace {
-        match self {
-            Color::Luma(_) => ColorSpace::Luma,
-            Color::LumaA(_) => ColorSpace::LumaA,
-            Color::Rgb(_) => ColorSpace::Rgb,
-            Color::Rgba(_) => ColorSpace::Rgba,
-            Color::Bgr(_) => ColorSpace::Bgr,
-            Color::Bgra(_) => ColorSpace::Bgra,
-        }
-    }
-}
-
-fn color_space(image: &DynamicImage) -> ColorSpace {
-    match image {
-        ImageLuma8(_) => ColorSpace::Luma,
-        ImageLumaA8(_) => ColorSpace::LumaA,
-        ImageRgb8(_) => ColorSpace::Rgb,
-        ImageRgba8(_) => ColorSpace::Rgba,
-        ImageBgr8(_) => ColorSpace::Bgr,
-        ImageBgra8(_) => ColorSpace::Bgra,
-    }
 }
 
 impl ImageOp for Const {
@@ -819,8 +787,6 @@ fn constant(c: &Const) -> DynamicImage {
         Color::LumaA(l) => ImageLumaA8(ImageBuffer::from_pixel(c.width, c.height, l)),
         Color::Rgb(l) => ImageRgb8(ImageBuffer::from_pixel(c.width, c.height, l)),
         Color::Rgba(l) => ImageRgba8(ImageBuffer::from_pixel(c.width, c.height, l)),
-        Color::Bgr(l) => ImageBgr8(ImageBuffer::from_pixel(c.width, c.height, l)),
-        Color::Bgra(l) => ImageBgra8(ImageBuffer::from_pixel(c.width, c.height, l)),
     }
 }
 
@@ -862,8 +828,6 @@ fn draw_circle(image: &DynamicImage, circle: &Circle) -> DynamicImage {
         Color::LumaA(c) => c.to_rgba(),
         Color::Rgb(c) => c.to_rgba(),
         Color::Rgba(c) => c.to_rgba(),
-        Color::Bgr(c) => c.to_rgba(),
-        Color::Bgra(c) => c.to_rgba(),
     };
 
     // TODO: We always consume entries from the stack, so we using mutating functions where
@@ -900,7 +864,6 @@ fn translate(image: &DynamicImage, tx: i32, ty: i32) -> DynamicImage {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use nom::error::ErrorKind;
 
     fn assert_pipeline_parse(pipeline: &str, expected: &[&str]) {
         let parsed = parse_pipeline(pipeline);

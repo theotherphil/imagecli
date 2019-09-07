@@ -10,6 +10,7 @@ use crate::image_ops::run_pipeline;
 mod expr;
 mod error;
 use crate::error::Result;
+mod parse_utils;
 
 #[cfg(test)]
 extern crate test;

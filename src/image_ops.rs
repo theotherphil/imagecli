@@ -7,12 +7,13 @@ use imageproc::definitions::Clamp;
 use crate::expr::Expr;
 use std::cmp;
 use crate::ImageStack;
+use crate::parse_utils::{op_zero, op_one, op_one_opt, op_two, int};
 use nom::{
     IResult,
     branch::alt,
     bytes::complete::tag,
-    combinator::{all_consuming, map, map_res, opt},
-    character::complete::{digit1, space0, space1},
+    combinator::{all_consuming, map},
+    character::complete::{space0, space1},
     multi::separated_nonempty_list,
     number::complete::float,
     sequence::{delimited, pair, preceded, tuple}
@@ -131,77 +132,6 @@ fn parse_array(input: &str) -> IResult<&str, Array> {
         ),
         |v| Array(v)
     )(input)
-}
-
-fn int<T: std::str::FromStr>(input: &str) -> IResult<&str, T> {
-    map_res(digit1, |s: &str| s.parse::<T>())(input)
-}
-
-// Operator which takes no args
-fn op_zero<T: Clone>(name: &'static str, t: T) -> impl Fn(&str) -> IResult<&str, T> {
-    move |i| map(tag(name), |_| t.clone())(i)
-}
-
-// Operator which takes a single arg
-fn op_one<'a, T, F1, A1, G>(
-    name: &'static str,
-    arg1: F1,
-    build: G
-) -> impl Fn(&'a str) -> IResult<&'a str, T>
-where
-    F1: Fn(&'a str) -> IResult<&'a str, A1> + Copy,
-    G: Fn(A1) -> T + Copy
-{
-    move |i| map(
-        preceded(
-            tag(name),
-            preceded(space1, arg1)
-        ),
-        |val| build(val)
-    )(i)
-}
-
-// Operator which takes a single optional arg
-fn op_one_opt<'a, T, F1, A1, G>(
-    name: &'static str,
-    arg1: F1,
-    build: G
-) -> impl Fn(&'a str) -> IResult<&'a str, T>
-where
-    F1: Fn(&'a str) -> IResult<&'a str, A1> + Copy,
-    G: Fn(Option<A1>) -> T + Copy
-{
-    move |i| map(
-        preceded(
-            tag(name),
-            opt(preceded(space1, arg1))
-        ),
-        build
-    )(i)
-}
-
-// Operator which takes twp args
-fn op_two<T, F1, F2, A1, A2, G>(
-    name: &'static str,
-    arg1: F1,
-    arg2: F2,
-    build: G
-) -> impl Fn(&str) -> IResult<&str, T>
-where
-    F1: Fn(&str) -> IResult<&str, A1> + Copy,
-    F2: Fn(&str) -> IResult<&str, A2> + Copy,
-    G: Fn(A1, A2) -> T + Copy
-{
-    move |i| map(
-        preceded(
-            tag(name),
-            tuple((
-                preceded(space1, arg1),
-                preceded(space1, arg2),
-            ))
-        ),
-        |(val1, val2)| build(val1, val2)
-    )(i)
 }
 
 // TODO: Remove duplication between this and parse_const

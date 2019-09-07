@@ -18,6 +18,20 @@ use nom::{
     sequence::{delimited, pair, preceded, tuple}
 };
 
+pub fn run_pipeline(pipeline: &str, inputs: Vec<DynamicImage>, verbose: bool) -> Vec<DynamicImage> {
+    let mut stack = ImageStack::new(inputs);
+    let ops = parse(pipeline);
+
+    for op in ops {
+        if verbose {
+            println!("Applying {:?}", op);
+        }
+        op.apply(&mut stack);
+    }
+
+    stack.contents()
+}
+
 /// An image processing operation that operates on a stack of images.
 pub trait ImageOp : std::fmt::Debug {
     fn apply(&self, stack: &mut ImageStack);
@@ -974,10 +988,25 @@ mod tests {
 
     #[bench]
     fn bench_pipeline_parsing(b: &mut Bencher) {
-        let pipeline = black_box("gray > func { 255 * (p > 100) } > rotate 45 > scale 10");
+        let pipeline = black_box(
+            "gray > func { 255 * (p > 100) } > rotate 45 > othresh > scale 2"
+        );
         b.iter(|| {
             let pipeline = parse_pipeline(pipeline).unwrap();
             black_box(pipeline);
+        });
+    }
+
+    #[bench]
+    fn bench_run_pipeline(b: &mut Bencher) {
+        let pipeline =
+            "gray > func { 255 * (p > 100) } > DUP > ROT 2 > rotate 45 > othresh > scale 2";
+        let image = DynamicImage::ImageLuma8(
+            ImageBuffer::from_fn(40, 40, |x, y| Luma([(x + y) as u8]))
+        );
+        b.iter(|| {
+            let inputs = black_box(vec![image.clone()]);
+            let _ = black_box(run_pipeline(pipeline, inputs, false));
         });
     }
 }

@@ -6,7 +6,7 @@ use image::{DynamicImage, GenericImageView, open};
 
 mod stack;
 mod image_ops;
-use crate::image_ops::parse;
+use crate::image_ops::run_pipeline;
 mod expr;
 mod error;
 use crate::error::Result;
@@ -77,18 +77,4 @@ fn main() -> Result<()> {
         image.save(path)?;
     }
     Ok(())
-}
-
-fn run_pipeline(pipeline: &str, inputs: Vec<DynamicImage>, verbose: bool) -> Vec<DynamicImage> {
-    let mut stack = ImageStack::new(inputs);
-    let ops = parse(pipeline);
-
-    for op in ops {
-        if verbose {
-            println!("Applying {:?}", op);
-        }
-        op.apply(&mut stack);
-    }
-
-    stack.contents()
 }

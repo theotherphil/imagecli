@@ -38,11 +38,27 @@ pub trait ImageOp : std::fmt::Debug {
 }
 
 pub fn parse(pipeline: &str) -> Vec<Box<dyn ImageOp>> {
-    let pipeline = parse_pipeline(pipeline);
-    match pipeline {
+    let parsed = parse_pipeline(pipeline);
+    match parsed {
         Ok(p) => p.1,
         Err(e) => {
-            panic!("Unable to parse pipeline: {:?}", e)
+            let remaining = match e {
+                nom::Err::Error(e) => e.0,
+                _ => unreachable!(),
+            };
+            let consumed = &pipeline[0..pipeline.len() - remaining.len()];
+            panic!(
+                "
+Unable to parse pipeline.
+
+Consumed: '{}'
+Remaining: '{}'
+
+The error is likely near the start of the remaining (unparsed) text.
+",
+                consumed,
+                remaining
+            )
         }
     }
 }

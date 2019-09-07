@@ -17,8 +17,6 @@ extern crate test;
 type ImageStack = stack::Stack<DynamicImage>;
 
 // TODO:
-//  - better error handling - print a message saying how much we managed to parse and
-//    where we failed
 //  - support different signatures in Array op
 //  - scale is extremely slow. Fix this.
 //  - example showing changing format of all images in a directory maching some pattern

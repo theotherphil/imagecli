@@ -101,3 +101,9 @@ cargo run --release -- -v -i images/robin.jpg -o images/16.png -p 'DUP 2 > const
 </pre>
 
 <img src="images/16.png" alt="Output"/>
+
+<pre>
+cargo run --release -- -v -i images/robin.jpg -o images/17.png -p 'gray > func { 255 * (p > 100) }'
+</pre>
+
+<img src="images/17.png" alt="Output"/>

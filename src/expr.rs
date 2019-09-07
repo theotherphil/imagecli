@@ -17,7 +17,7 @@ pub fn parse_func<'a, 'b>(input: &'a str, name: &'b str) -> IResult<&'a str, (St
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ArithmeticOp { Add, Sub, Mul, Div, Exp }
+pub enum ArithmeticOp { Add, Sub, Mul, Div, Exp, Gt, Lt, Eq }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
@@ -37,12 +37,18 @@ impl Expr {
                 "q" => q,
                 _ => panic!("Invalid variable"),
             },
-            Expr::Binary(op, left, right) => match op {
-                ArithmeticOp::Add => left.evaluate(x, y, p, q) + right.evaluate(x, y, p, q),
-                ArithmeticOp::Sub => left.evaluate(x, y, p, q) - right.evaluate(x, y, p, q),
-                ArithmeticOp::Mul => left.evaluate(x, y, p, q) * right.evaluate(x, y, p, q),
-                ArithmeticOp::Div => left.evaluate(x, y, p, q) / right.evaluate(x, y, p, q),
-                ArithmeticOp::Exp => left.evaluate(x, y, p, q).powf(right.evaluate(x, y, p, q)),
+            Expr::Binary(op, left, right) => {
+                let (left, right) = (left.evaluate(x, y, p, q), right.evaluate(x, y, p, q));
+                match op {
+                    ArithmeticOp::Add => left + right,
+                    ArithmeticOp::Sub => left - right,
+                    ArithmeticOp::Mul => left * right,
+                    ArithmeticOp::Div => left / right,
+                    ArithmeticOp::Exp => left.powf(right),
+                    ArithmeticOp::Gt => if left > right { 1.0 } else { 0.0 },
+                    ArithmeticOp::Lt => if left < right { 1.0 } else { 0.0 },
+                    ArithmeticOp::Eq => if left == right { 1.0 } else { 0.0 },
+                }
             }
         }
     }
@@ -59,6 +65,9 @@ enum Token {
     Mul,
     Div,
     Exp,
+    Gt,
+    Lt,
+    Eq,
     LParen,
     RParen,
 }
@@ -73,6 +82,9 @@ impl std::fmt::Display for Token {
             Token::Mul => "*".into(),
             Token::Div => "/".into(),
             Token::Exp => "^".into(),
+            Token::Gt => ">".into(),
+            Token::Lt => "<".into(),
+            Token::Eq => "=".into(),
             Token::LParen => "(".into(),
             Token::RParen => ")".into(),
         };
@@ -88,6 +100,9 @@ fn token(input: &str) -> IResult<&str, Token> {
         map(tag("*"), |_| Token::Mul),
         map(tag("/"), |_| Token::Div),
         map(tag("^"), |_| Token::Exp),
+        map(tag(">"), |_| Token::Gt),
+        map(tag("<"), |_| Token::Lt),
+        map(tag("="), |_| Token::Eq),
         map(tag("("), |_| Token::LParen),
         map(tag(")"), |_| Token::RParen),
         map(alpha1, |n: &str| Token::Var(n.into())),
@@ -115,8 +130,12 @@ fn lex<'a, 'b>(input: &'a str, name: &'b str) -> IResult<&'a str, Vec<Token>> {
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 enum Associativity { Right, Left }
 
+// Higher precedence operators bind more tightly
 fn precedence(token: &Token) -> u32 {
     match token {
+        Token::Gt => 1,
+        Token::Lt => 1,
+        Token::Eq => 1,
         Token::Add => 2,
         Token::Sub => 2,
         Token::Mul => 3,
@@ -129,24 +148,30 @@ fn precedence(token: &Token) -> u32 {
 
 fn associativity(token: &Token) -> Associativity {
     match token {
+        Token::Gt => Associativity::Left,
+        Token::Lt => Associativity::Left,
+        Token::Eq => Associativity::Left,
         Token::Add => Associativity::Left,
         Token::Sub => Associativity::Left,
         Token::Mul => Associativity::Left,
         Token::Div => Associativity::Left,
         Token::Exp => Associativity::Right,
-        // TODO: introduce a new enum for just the tokens?
+        // TODO: introduce a new enum for just the ops?
         _ => panic!("Not an operator"),
     }
 }
 
 fn arithmetic_op(token: &Token) -> ArithmeticOp {
     match token {
+        Token::Gt => ArithmeticOp::Gt,
+        Token::Lt => ArithmeticOp::Lt,
+        Token::Eq => ArithmeticOp::Eq,
         Token::Add => ArithmeticOp::Add,
         Token::Sub => ArithmeticOp::Sub,
         Token::Mul => ArithmeticOp::Mul,
         Token::Div => ArithmeticOp::Div,
         Token::Exp => ArithmeticOp::Exp,
-        // TODO: introduce a new enum for just the tokens?
+        // TODO: introduce a new enum for just the ops?
         _ => panic!("Not an arithmetic operator"),
     }
 }
@@ -160,7 +185,8 @@ fn is_lparen(token: &Token) -> bool {
 
 fn is_operator(token: &Token) -> bool {
     match token {
-        Token::Add | Token::Sub | Token::Mul | Token::Div | Token::Exp => true,
+        Token::Add | Token::Sub | Token::Mul | Token::Div
+        | Token::Exp | Token::Lt | Token::Gt | Token::Eq => true,
         _ => false,
     }
 }
@@ -180,7 +206,8 @@ fn parse_expr(tokens: &[Token]) -> Expr {
         match token {
             Token::Num(n) => output_queue.push(Expr::Num(*n)),
             Token::Var(v) => output_queue.push(Expr::Var(v.clone())),
-            Token::Add | Token::Sub | Token::Mul | Token::Div | Token::Exp => {
+            Token::Add | Token::Sub | Token::Mul | Token::Div
+            | Token::Exp | Token::Lt | Token::Gt | Token::Eq => {
                 loop {
                     if operator_stack.is_empty() {
                         break;
@@ -249,6 +276,7 @@ mod tests {
     macro_rules! mul { ($left:expr, $right:expr) => {  op!(ArithmeticOp::Mul, $left, $right) } }
     macro_rules! div { ($left:expr, $right:expr) => {  op!(ArithmeticOp::Div, $left, $right) } }
     macro_rules! exp { ($left:expr, $right:expr) => {  op!(ArithmeticOp::Exp, $left, $right) } }
+    macro_rules! gt  { ($left:expr, $right:expr) => {  op!(ArithmeticOp::Gt, $left, $right) } }
     macro_rules! num { ($num:expr) => { Expr::Num($num) } }
     macro_rules! var { ($var:expr) => { Expr::Var($var.into()) } }
 
@@ -271,6 +299,9 @@ mod tests {
             "*" => Token::Mul,
             "/" => Token::Div,
             "^" => Token::Exp,
+            ">" => Token::Gt,
+            "<" => Token::Lt,
+            "=" => Token::Eq,
             _ => Token::Var(t.into())
         }
     }
@@ -380,6 +411,15 @@ mod tests {
                 )
             )
         );
+        let expr = parse_expr(&tokens);
+        assert_eq!(expr, expected);
+    }
+
+    #[test]
+    fn test_parse_expr_relational() {
+        // (3 + 4) * 2 > 1
+        let tokens = tokens!["(", "3", "+", "4", ")", "*", "2", ">", "1"];
+        let expected = gt!(mul!(add!(num!(3.0), num!(4.0)), num!(2.0)), num!(1.0));
         let expr = parse_expr(&tokens);
         assert_eq!(expr, expected);
     }

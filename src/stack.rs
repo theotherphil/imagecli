@@ -25,11 +25,11 @@ impl<T: Clone> Stack<T> {
     /// dup 2 (a -- a a a)
     pub fn dup(&mut self, n: usize) {
         self.assert_stack_size("dup", 1);
-        // TODO: Remove unnecessary clone
-        let a = self.contents[self.len() - 1].clone();
+        let a = self.contents.pop().unwrap();
         for _ in 0..n {
             self.contents.push(a.clone());
         }
+        self.contents.push(a);
     }
 
     /// drop ( a -- )
@@ -42,9 +42,7 @@ impl<T: Clone> Stack<T> {
     pub fn rot(&mut self, n: usize) {
         if n < 2 { return; }
         self.assert_stack_size("rot", n);
-        // TODO: Remove unnecessary clone
-        let a = self.contents[self.len() - 1].clone();
-        self.contents.remove(self.contents.len() - 1);
+        let a = self.contents.remove(self.contents.len() - 1);
         self.contents.insert(self.len() - (n - 1), a);
     }
 

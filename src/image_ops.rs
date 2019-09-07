@@ -998,9 +998,20 @@ mod tests {
     }
 
     #[bench]
+    fn bench_run_pipeline_with_user_defined_func(b: &mut Bencher) {
+        let pipeline = "func { 255 * (p > 100) }";
+        let image = DynamicImage::ImageLuma8(
+            ImageBuffer::from_fn(40, 40, |x, y| Luma([(x + y) as u8]))
+        );
+        b.iter(|| {
+            let inputs = black_box(vec![image.clone()]);
+            let _ = black_box(run_pipeline(pipeline, inputs, false));
+        });
+    }
+
+    #[bench]
     fn bench_run_pipeline(b: &mut Bencher) {
-        let pipeline =
-            "gray > func { 255 * (p > 100) } > DUP > ROT 2 > rotate 45 > othresh > scale 2";
+        let pipeline = "gray > DUP > ROT 2 > rotate 45 > othresh > scale 2";
         let image = DynamicImage::ImageLuma8(
             ImageBuffer::from_fn(40, 40, |x, y| Luma([(x + y) as u8]))
         );

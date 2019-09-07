@@ -10,7 +10,7 @@ use crate::ImageStack;
 use nom::{
     IResult,
     branch::alt,
-    bytes::complete::{tag, tag_no_case},
+    bytes::complete::tag,
     combinator::{all_consuming, map, map_res, opt},
     character::complete::{digit1, space0, space1},
     multi::separated_nonempty_list,
@@ -63,8 +63,8 @@ fn parse_image_op(input: &str) -> IResult<&str, Box<dyn ImageOp>> {
             map_box!(op_one("carve", float, |x| Carve(x))),
             map_box!(parse_circle),
             map_box!(parse_const),
-            map_box!(op_zero("drop", Drop)),
-            map_box!(op_one_opt("dup", int::<usize>, |x| Dup(x.unwrap_or(1)))),
+            map_box!(op_zero("DROP", Drop)),
+            map_box!(op_one_opt("DUP", int::<usize>, |x| Dup(x.unwrap_or(1)))),
             map_box!(parse_func),
             map_box!(parse_func2),
             map_box!(op_one("gaussian", float, |x| Gaussian(x))),
@@ -76,13 +76,13 @@ fn parse_image_op(input: &str) -> IResult<&str, Box<dyn ImageOp>> {
             map_box!(op_two("median", int::<u32>, int::<u32>, |rx, ry| Median(rx, ry))),
             map_box!(op_zero("othresh", OtsuThreshold)),
             map_box!(op_zero("red", Red)),
-            map_box!(op_one_opt("rot", int::<usize>, |x| Rot(x.unwrap_or(3)))),
+            map_box!(op_one_opt("ROT", int::<usize>, |x| Rot(x.unwrap_or(3)))),
             map_box!(op_one("rotate", float, |x| Rotate(x))),
         )),
         alt((
             map_box!(op_one("scale", float, |x| Scale(x))),
             map_box!(op_zero("sobel", Sobel)),
-            map_box!(op_zero("swap", Rot(2))),
+            map_box!(op_zero("SWAP", Rot(2))),
             map_box!(op_two("translate", int::<i32>, int::<i32>, |tx, ty| Translate(tx, ty))),
             map_box!(op_one_opt("vcat", int::<u32>, |x| Grid(1, x.unwrap_or(2)))),
         )),
@@ -109,7 +109,7 @@ fn int<T: std::str::FromStr>(input: &str) -> IResult<&str, T> {
 
 // Operator which takes no args
 fn op_zero<T: Clone>(name: &'static str, t: T) -> impl Fn(&str) -> IResult<&str, T> {
-    move |i| map(tag_no_case(name), |_| t.clone())(i)
+    move |i| map(tag(name), |_| t.clone())(i)
 }
 
 // Operator which takes a single arg
@@ -124,7 +124,7 @@ where
 {
     move |i| map(
         preceded(
-            tag_no_case(name),
+            tag(name),
             preceded(space1, arg1)
         ),
         |val| build(val)
@@ -143,7 +143,7 @@ where
 {
     move |i| map(
         preceded(
-            tag_no_case(name),
+            tag(name),
             opt(preceded(space1, arg1))
         ),
         build
@@ -164,7 +164,7 @@ where
 {
     move |i| map(
         preceded(
-            tag_no_case(name),
+            tag(name),
             tuple((
                 preceded(space1, arg1),
                 preceded(space1, arg2),
@@ -180,7 +180,7 @@ where
 fn parse_circle(input: &str) -> IResult<&str, Circle> {
     map(
         preceded(
-            tag_no_case("circle"),
+            tag("circle"),
             tuple((
                 preceded(space1, alt((tag("filled"), tag("hollow")))),
                 pair(preceded(space1, int::<i32>), preceded(space1, int::<i32>)),
@@ -218,7 +218,7 @@ fn parse_color(input: &str) -> IResult<&str, Color> {
 fn parse_const(input: &str) -> IResult<&str, Const> {
     map(
         preceded(
-            tag_no_case("const"),
+            tag("const"),
             tuple((
                 preceded(space1, int::<u32>),
                 preceded(space1, int::<u32>),
@@ -968,5 +968,16 @@ mod tests {
             "grid 12 34",
             &vec!["Grid(12, 34)"]
         );
+    }
+
+    use test::{Bencher, black_box};
+
+    #[bench]
+    fn bench_pipeline_parsing(b: &mut Bencher) {
+        let pipeline = black_box("gray > func { 255 * (p > 100) } > rotate 45 > scale 10");
+        b.iter(|| {
+            let pipeline = parse_pipeline(pipeline).unwrap();
+            black_box(pipeline);
+        });
     }
 }

@@ -1,3 +1,5 @@
+#![cfg_attr(test, feature(test))]
+
 use std::path::PathBuf;
 use structopt::StructOpt;
 use image::{DynamicImage, GenericImageView, open};
@@ -9,21 +11,25 @@ mod expr;
 mod error;
 use crate::error::Result;
 
+#[cfg(test)]
+extern crate test;
+
 type ImageStack = stack::Stack<DynamicImage>;
 
 // TODO:
-//  - add tests for parsing ops
+//  - better error handling - print a message saying how much we managed to parse and
+//    where we failed
 //  - support different signatures in Array op
 //  - example showing changing format of all images in a directory maching some pattern
 //  - flip, thumbnails, crop, allow targeting a fixed size image
 //  - add ability to add margins
-//  - add validation for parsing of individual stages (make them subcommands somehow?)
-//      or use a parser combinatory library, e.g. nom
-//  - add specific subcommands for the pipeline stages?
-//      e.g. make -p 'scale 0.4' equivalent to --scale 0.4
 //  - add stages with optional parameters. e.g. rotate uses image centre by default, but user
 //      can specify a centre of rotation if they like
 //  - make performance less atrocious. Don't just clone everything all the time
+//  - add mask operation, and example of masking with a circle
+//  - add ability to handle entire pixels in user-defined funcs, not just subpixels.
+//    access via p.0, p.1, etc.? Write example rotating red green and blue channels
+//    rgb(p.1, p.2, p.0)
 
 #[derive(StructOpt, Debug)]
 struct Opt {

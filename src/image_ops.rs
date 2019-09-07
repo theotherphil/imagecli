@@ -40,11 +40,11 @@ fn parse_pipeline(input: &str) -> IResult<&str, Vec<Box<dyn ImageOp>>> {
 }
 
 fn parse_connector(input: &str) -> IResult<&str, ()> {
-    delimited(space0, map(tag(">"), |s: &str| ()), space0)(input)
+    delimited(space0, map(tag(">"), |_| ()), space0)(input)
 }
 
 /// I wanted to write this as a function, but got confused by the resulting compiler errors.
-macro_rules! box_output {
+macro_rules! map_box {
     ($parser:expr) => {
         map($parser, |o| {
             let boxed: Box<dyn ImageOp> = Box::new(o);
@@ -57,34 +57,34 @@ fn parse_image_op(input: &str) -> IResult<&str, Box<dyn ImageOp>> {
     // Nested alts are required because alt only supports tuples with up 21 elements.
     alt((
         alt((
-            box_output!(parse_adaptive_threshold),
-            box_output!(parse_array),
-            box_output!(parse_blue),
-            box_output!(parse_carve),
-            box_output!(parse_circle),
-            box_output!(parse_const),
-            box_output!(parse_drop),
-            box_output!(parse_dup),
-            box_output!(parse_func),
-            box_output!(parse_func2),
-            box_output!(parse_gaussian),
-            box_output!(parse_gray),
-            box_output!(parse_green),
-            box_output!(parse_grid),
-            box_output!(parse_hcat),
-            box_output!(parse_id),
-            box_output!(parse_median),
-            box_output!(parse_othresh),
-            box_output!(parse_red),
-            box_output!(parse_rot),
-            box_output!(parse_rotate),
+            map_box!(parse_array),
+            map_box!(op_one("athresh", int::<u32>, |x| AdaptiveThreshold(x))),
+            map_box!(op_zero("blue", Blue)),
+            map_box!(op_one("carve", float, |x| Carve(x))),
+            map_box!(parse_circle),
+            map_box!(parse_const),
+            map_box!(op_zero("drop", Drop)),
+            map_box!(op_one_opt("dup", int::<usize>, |x| Dup(x.unwrap_or(1)))),
+            map_box!(parse_func),
+            map_box!(parse_func2),
+            map_box!(op_one("gaussian", float, |x| Gaussian(x))),
+            map_box!(op_zero("gray", Gray)),
+            map_box!(op_zero("green", Green)),
+            map_box!(op_two("grid", int::<u32>, int::<u32>, |w, h| Grid(w, h))),
+            map_box!(op_one_opt("hcat", int::<u32>, |x| Grid(x.unwrap_or(2), 1))),
+            map_box!(op_zero("id", Id)),
+            map_box!(op_two("median", int::<u32>, int::<u32>, |rx, ry| Median(rx, ry))),
+            map_box!(op_zero("othresh", OtsuThreshold)),
+            map_box!(op_zero("red", Red)),
+            map_box!(op_one_opt("rot", int::<usize>, |x| Rot(x.unwrap_or(3)))),
+            map_box!(op_one("rotate", float, |x| Rotate(x))),
         )),
         alt((
-            box_output!(parse_scale),
-            box_output!(parse_sobel),
-            box_output!(parse_swap),
-            box_output!(parse_translate),
-            box_output!(parse_vcat),
+            map_box!(op_one("scale", float, |x| Scale(x))),
+            map_box!(op_zero("sobel", Sobel)),
+            map_box!(op_zero("swap", Rot(2))),
+            map_box!(op_two("translate", int::<i32>, int::<i32>, |tx, ty| Translate(tx, ty))),
+            map_box!(op_one_opt("vcat", int::<u32>, |x| Grid(1, x.unwrap_or(2)))),
         )),
     ))(input)
 }
@@ -108,88 +108,62 @@ fn int<T: std::str::FromStr>(input: &str) -> IResult<&str, T> {
     map_res(digit1, |s: &str| s.parse::<T>())(input)
 }
 
-/// Generates parsers which match a literal and return a struct of the specific field-less type.
-macro_rules! named_empty_struct_parsers {
-    ($( $parser_name:ident, $name:expr, $type:ident );* $(;)? )  => {
-        $(
-            fn $parser_name(input: &str) -> IResult<&str, $type> {
-                map(tag_no_case($name), |_| $type)(input)
-            }
-        )*
-    }
-}
-
-named_empty_struct_parsers!(
-    parse_gray, "gray", Gray;
-    parse_id, "id", Id;
-    parse_red, "red", Red;
-    parse_green, "green", Green;
-    parse_blue, "blue", Blue;
-    parse_sobel, "sobel", Sobel;
-    parse_othresh, "othresh", OtsuThreshold;
-    parse_drop, "DROP", Drop;
-);
-
 // Operator which takes no args
-fn op_zero<'a, 'b, T: Clone>(input: &'a str, name: &'b str, t: T) -> IResult<&'a str, T> {
-    map(tag_no_case(name), |_| t.clone())(input)
+fn op_zero<T: Clone>(name: &'static str, t: T) -> impl Fn(&str) -> IResult<&str, T> {
+    move |i| map(tag_no_case(name), |_| t.clone())(i)
 }
 
 // Operator which takes a single arg
-fn op_one<'a, 'b, T, F1, A1, G>(
-    input: &'a str,
-    name: &'b str,
+fn op_one<'a, T, F1, A1, G>(
+    name: &'static str,
     arg1: F1,
     build: G
-) -> IResult<&'a str, T>
+) -> impl Fn(&'a str) -> IResult<&'a str, T>
 where
-    F1: Fn(&'a str) -> IResult<&'a str, A1>,
-    G: Fn(A1) -> T
+    F1: Fn(&'a str) -> IResult<&'a str, A1> + Copy,
+    G: Fn(A1) -> T + Copy
 {
-    map(
+    move |i| map(
         preceded(
             tag_no_case(name),
             preceded(space1, arg1)
         ),
-        build
-    )(input)
+        |val| build(val)
+    )(i)
 }
 
 // Operator which takes a single optional arg
-// TODO: unify with op_one
-fn op_one_opt<'a, 'b, T, F1, A1, G>(
-    input: &'a str,
-    name: &'b str,
+fn op_one_opt<'a, T, F1, A1, G>(
+    name: &'static str,
     arg1: F1,
     build: G
-) -> IResult<&'a str, T>
+) -> impl Fn(&'a str) -> IResult<&'a str, T>
 where
-    F1: Fn(&'a str) -> IResult<&'a str, A1>,
-    G: Fn(Option<A1>) -> T
+    F1: Fn(&'a str) -> IResult<&'a str, A1> + Copy,
+    G: Fn(Option<A1>) -> T + Copy
 {
-    map(
+    move |i| map(
         preceded(
             tag_no_case(name),
             opt(preceded(space1, arg1))
         ),
         build
-    )(input)
+    )(i)
 }
 
 // Operator which takes twp args
-fn op_two<'a, 'b, T, F1, F2, A1, A2, G>(
-    input: &'a str,
-    name: &'b str,
+fn op_two<T, F1, F2, A1, A2, G>(
+    name: &'static str,
     arg1: F1,
     arg2: F2,
     build: G
-) -> IResult<&'a str, T>
+) -> impl Fn(&str) -> IResult<&str, T>
 where
-    F1: Fn(&'a str) -> IResult<&'a str, A1>,
-    F2: Fn(&'a str) -> IResult<&'a str, A2>,
-    G: Fn(A1, A2) -> T
+    F1: Fn(&str) -> IResult<&str, A1> + Copy,
+    F2: Fn(&str) -> IResult<&str, A2> + Copy,
+    G: Fn(A1, A2) -> T + Copy
 {
-    map(
+    move |i| map(
         preceded(
             tag_no_case(name),
             tuple((
@@ -198,76 +172,7 @@ where
             ))
         ),
         |(val1, val2)| build(val1, val2)
-    )(input)
-}
-
-// 'grid 12 34' -> Grid(12, 34)
-fn parse_grid(input: &str) -> IResult<&str, Grid> {
-    op_two(input, "grid", int::<u32>, int::<u32>, |w, h| Grid(w, h))
-}
-
-// 'median 12 34' -> Median(12, 34)
-fn parse_median(input: &str) -> IResult<&str, Median> {
-    op_two(input, "median", int::<u32>, int::<u32>, |rx, ry| Median(rx, ry))
-}
-
-// 'translate 10 20' -> Translate(10, 20)
-fn parse_translate(input: &str) -> IResult<&str, Translate> {
-    op_two(input, "translate", int::<i32>, int::<i32>, |tx, ty| Translate(tx, ty))
-}
-
-// 'scale 12' -> Scale(12.0)
-fn parse_scale(input: &str) -> IResult<&str, Scale> {
-    op_one(input, "scale", float, |x| Scale(x))
-}
-
-// 'gaussian 12' -> Gaussian(12.0)
-fn parse_gaussian(input: &str) -> IResult<&str, Gaussian> {
-    op_one(input, "gaussian", float, |x| Gaussian(x))
-}
-
-// 'rotate 45' -> Rotate(45.0)
-fn parse_rotate(input: &str) -> IResult<&str, Rotate> {
-    op_one(input, "rotate", float, |x| Rotate(x))
-}
-
-// 'carve 0.85' -> Carve(0.85)
-fn parse_carve(input: &str) -> IResult<&str, Carve> {
-    op_one(input, "carve", float, |x| Carve(x))
-}
-
-// 'athresh 12' -> AdaptiveThreshold(12)
-fn parse_adaptive_threshold(input: &str) -> IResult<&str, AdaptiveThreshold> {
-    op_one(input, "athresh", int::<u32>, |x| AdaptiveThreshold(x))
-}
-
-// 'DUP' -> Dup(1)
-// 'DUP 3' -> Dup(3)
-fn parse_dup(input: &str) -> IResult<&str, Dup> {
-    op_one_opt(input, "dup", int::<usize>, |x| Dup(x.unwrap_or(1)))
-}
-
-// 'ROT' -> Rot(3)
-// 'ROT 4' -> Rot(4)
-fn parse_rot(input: &str) -> IResult<&str, Rot> {
-    op_one_opt(input, "rot", int::<usize>, |x| Rot(x.unwrap_or(3)))
-}
-
-// 'SWAP' -> Rot(2)
-fn parse_swap(input: &str) -> IResult<&str, Rot> {
-    op_zero(input, "swap", Rot(2))
-}
-
-// 'hcat' -> Grid 2 1
-// 'hcat 3' -> Grid 3 1
-fn parse_hcat(input: &str) -> IResult<&str, Grid> {
-    op_one_opt(input, "hcat", int::<u32>, |x| Grid(x.unwrap_or(2), 1))
-}
-
-// 'vcat' -> Grid 1 2
-// 'vcat 3' -> Grid 1 3
-fn parse_vcat(input: &str) -> IResult<&str, Grid> {
-    op_one_opt(input, "vcat", int::<u32>, |x| Grid(1, x.unwrap_or(2)))
+    )(i)
 }
 
 // TODO: Remove duplication between this and parse_const
@@ -997,148 +902,108 @@ mod tests {
     use super::*;
     use nom::error::ErrorKind;
 
-    #[test]
-    fn test_parse_valid_single_stage_pipeline() {
-        let pipeline = "circle filled 231 337 100 (255, 255, 0)";
+    fn assert_pipeline_parse(pipeline: &str, expected: &[&str]) {
         let parsed = parse_pipeline(pipeline);
         match parsed {
             Err(_) => panic!("Parse should succeed"),
             Ok((i, v)) => {
                 assert_eq!(i, "");
                 let descriptions: Vec<String> = v.iter().map(|o| format!("{:?}", o)).collect();
-                let expected = vec![
-                    String::from(
-                        "Circle { fill: Filled, center: (231, 337), radius: 100, color: Rgb(Rgb([255, 255, 0])) }"
-                    )
-                ];
                 assert_eq!(descriptions, expected);
             }
         }
+    }
+
+    fn assert_pipeline_parse_failure(pipeline: &str) {
+        let parsed = parse_pipeline(pipeline);
+        match parsed {
+            Ok((i, v)) => panic!("Parse succeeded, but should have failed. i: {:?}, v: {:?}", i, v),
+            Err(_) => (), // TODO: add error reporting, with tests
+        }
+    }
+
+    #[test]
+    fn test_parse_valid_single_stage_pipeline() {
+        assert_pipeline_parse(
+            "circle filled 231 337 100 (255, 255, 0)",
+            &vec!["Circle { fill: Filled, center: (231, 337), radius: 100, color: Rgb(Rgb([255, 255, 0])) }"]
+        );
     }
 
     #[test]
     fn test_parse_invalid_single_stage_pipeline() {
-        let pipeline = "grid 1"; // Not valid, as grid requires two numerical inputs
-        let parsed = parse_pipeline(pipeline);
-        match parsed {
-            Ok((i, v)) => panic!("Parse succeeded, but should have failed. i: {:?}, v: {:?}", i, v),
-            Err(_) => (), // TODO: add error reporting, with tests
-        }
+        // Not valid, as grid requires two numerical inputs)
+        assert_pipeline_parse_failure("grid 1");
     }
 
     #[test]
     fn test_parse_valid_multi_stage_pipeline() {
-        let pipeline = "grid 1 2 > gray > scale 3 > id";
-        let parsed = parse_pipeline(pipeline);
-        match parsed {
-            Err(_) => panic!("Parse should succeed"),
-            Ok((i, v)) => {
-                assert_eq!(i, "");
-                let descriptions: Vec<String> = v.iter().map(|o| format!("{:?}", o)).collect();
-                let expected: Vec<String> = vec!["Grid(1, 2)", "Gray", "Scale(3.0)", "Id"]
-                    .into_iter()
-                    .map(|s| s.into())
-                    .collect();
-                assert_eq!(descriptions, expected);
-            }
-        }
+        assert_pipeline_parse(
+            "grid 1 2 > gray > scale 3 > id",
+            &vec!["Grid(1, 2)", "Gray", "Scale(3.0)", "Id"]
+        );
     }
 
     #[test]
     fn test_parse_invalid_multi_stage_pipeline() {
-        let pipeline = "gray > grid 1 > scale 3 > id"; // The grid stage is invalid
-        let parsed = parse_pipeline(pipeline);
-        match parsed {
-            Ok((i, v)) => panic!("Parse succeeded, but should have failed. i: {:?}, v: {:?}", i, v),
-            Err(_) => (), // TODO: add error reporting, with tests
-        }
+        // The grid stage is invalid
+        assert_pipeline_parse_failure("gray > grid 1 > scale 3 > id");
     }
 
     #[test]
     fn test_parse_circle() {
-        // RGB
-        assert_eq!(
-            parse_circle("circle filled 231 337 100 (255, 255, 0)"),
-            Ok((
-                "",
-                Circle {
-                    fill: FillType::Filled,
-                    center: (231, 337),
-                    radius: 100,
-                    color: Color::Rgb(Rgb([255, 255, 0]))
-                }
-            ))
+        assert_pipeline_parse(
+            "circle filled 231 337 100 (255, 255, 0)",
+            &vec!["Circle { fill: Filled, center: (231, 337), radius: 100, color: Rgb(Rgb([255, 255, 0])) }"]
         );
     }
 
     #[test]
     fn test_parse_hcat() {
         // No width provided - default to 2
-        assert_eq!(
-            parse_hcat("hcat"),
-            Ok(("", Grid(2, 1)))
+        assert_pipeline_parse(
+            "hcat",
+            &vec!["Grid(2, 1)"]
         );
         // Width provided
-        assert_eq!(
-            parse_hcat("hcat 3"),
-            Ok(("", Grid(3, 1)))
+        assert_pipeline_parse(
+            "hcat 3",
+            &vec!["Grid(3, 1)"]
         );
     }
 
     #[test]
     fn test_parse_scale() {
-        // Literal doesn't match
-        assert_eq!(
-            parse_scale("circle 1 2 3"),
-            Err(nom::Err::Error(("circle 1 2 3", ErrorKind::Tag)))
-        );
         // No number provided
-        assert_eq!(
-            parse_scale("scale"),
-            Err(nom::Err::Error(("", ErrorKind::Space)))
-        );
+        assert_pipeline_parse_failure("scale");
         // Correct incantation, integer literal
-        assert_eq!(
-            parse_scale("scale 3"),
-            Ok(("", Scale(3.0)))
+        assert_pipeline_parse(
+            "scale 3",
+            &vec!["Scale(3.0)"]
         );
         // Correct incantation, floating point literal
-        assert_eq!(
-            parse_scale("scale 3.0"),
-            Ok(("", Scale(3.0)))
+        assert_pipeline_parse(
+            "scale 3.0",
+            &vec!["Scale(3.0)"]
         );
     }
 
     #[test]
     fn test_parse_gray() {
-        // Literal doesn't match
-        assert_eq!(
-            parse_gray("blue"),
-            Err(nom::Err::Error(("blue", ErrorKind::Tag)))
-        );
-        // Literal matches
-        assert_eq!(
-            parse_gray("gray"),
-            Ok(("", Gray))
+        assert_pipeline_parse(
+            "gray",
+            &vec!["Gray"]
         );
     }
 
     #[test]
     fn test_parse_grid() {
-        // Literal doesn't match
-        assert_eq!(
-            parse_grid("circle 1 2 3"),
-            Err(nom::Err::Error(("circle 1 2 3", ErrorKind::Tag)))
-        );
         // Only one number provided
-        assert_eq!(
-            parse_grid("grid 12"),
-            Err(nom::Err::Error(("", ErrorKind::Space)))
-        );
+        assert_pipeline_parse_failure("grid 12");
         // Correct incantation
-        assert_eq!(
-            parse_grid("grid 12 34"),
-            Ok(("", Grid(12, 34)))
+        assert_pipeline_parse(
+            "grid 12 34",
+            &vec!["Grid(12, 34)"]
         );
     }
 }

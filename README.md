@@ -107,3 +107,9 @@ cargo run --release -- -v -i images/robin.jpg -o images/17.png -p 'gray > func {
 </pre>
 
 <img src="images/17.png" alt="Output"/>
+
+<pre>
+cargo run --release -- -v -i images/robin.jpg -o images/18.png -p 'resize w=100'
+</pre>
+
+<img src="images/18.png" alt="Output"/>

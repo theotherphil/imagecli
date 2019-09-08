@@ -21,7 +21,7 @@ type ImageStack = stack::Stack<DynamicImage>;
 //  - support different signatures in Array op
 //  - scale is extremely slow. Fix this.
 //  - example showing changing format of all images in a directory maching some pattern
-//  - flip, thumbnails, crop, allow targeting a fixed size image
+//  - flip, crop
 //  - add ability to add margins
 //  - add stages with optional parameters. e.g. rotate uses image centre by default, but user
 //      can specify a centre of rotation if they like
@@ -30,6 +30,14 @@ type ImageStack = stack::Stack<DynamicImage>;
 //  - add ability to handle entire pixels in user-defined funcs, not just subpixels.
 //    access via p.0, p.1, etc.? Write example rotating red green and blue channels
 //    rgb(p.1, p.2, p.0)
+//  - think about adding support for named parameters. check effect on perf (and compile times...)
+
+// functions provided by image::imageops:
+//  crop(img, x, y, w, h),
+//  resize (to new size), thumbnail - like resize but faster and worse quality
+//  flip_horizontal, flip_vertical, overlay(bottom, top, x, y),
+//  unsharpen(so maybe I should stop writing my own version for imageproc...)
+
 
 #[derive(StructOpt, Debug)]
 struct Opt {

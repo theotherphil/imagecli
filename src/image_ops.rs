@@ -7,10 +7,12 @@ use imageproc::definitions::Clamp;
 use crate::expr::Expr;
 use std::cmp;
 use crate::ImageStack;
-use crate::parse_utils::{op_zero, op_one, op_one_opt, op_two, int, nonempty_sequence};
+use crate::parse_utils::{
+    op_zero, op_one, op_one_opt, op_two, int, nonempty_sequence, named_arg
+};
 use nom::{
     IResult,
-    branch::alt,
+    branch::{alt, permutation},
     bytes::complete::tag,
     combinator::{all_consuming, map},
     character::complete::{space1},
@@ -92,10 +94,11 @@ fn parse_image_op(input: &str) -> IResult<&str, Box<dyn ImageOp>> {
             map_box!(op_two("median", int::<u32>, int::<u32>, |rx, ry| Median(rx, ry))),
             map_box!(op_zero("othresh", OtsuThreshold)),
             map_box!(op_zero("red", Red)),
+            map_box!(parse_resize),
             map_box!(op_one_opt("ROT", int::<usize>, |x| Rot(x.unwrap_or(3)))),
-            map_box!(op_one("rotate", float, |x| Rotate(x))),
         )),
         alt((
+            map_box!(op_one("rotate", float, |x| Rotate(x))),
             map_box!(op_one("scale", float, |x| Scale(x))),
             map_box!(op_zero("sobel", Sobel)),
             map_box!(op_zero("SWAP", Rot(2))),
@@ -109,6 +112,37 @@ fn parse_array(input: &str) -> IResult<&str, Array> {
     map(
         delimited(tag("["), nonempty_sequence(",", parse_image_op), tag("]")),
         |v| Array(v)
+    )(input)
+}
+
+// see test_parse_resize for usage
+fn parse_resize(input: &str) -> IResult<&str, Resize> {
+    preceded(
+        tag("resize"),
+        alt((
+            map(
+                tuple((
+                    preceded(space1, int::<u32>),
+                    preceded(space1, int::<u32>),
+                )),
+                |(w, h)| Resize { width: Some(w), height: Some(h) }
+            ),
+            map(
+                permutation((
+                    preceded(space1, named_arg("w", int::<u32>)),
+                    preceded(space1, named_arg("h", int::<u32>)),
+                )),
+                |(w, h)| Resize { width: Some(w), height: Some(h) }
+            ),
+            map(
+                preceded(space1, named_arg("w", int::<u32>)),
+                |w| Resize { width: Some(w), height: None}
+            ),
+            map(
+                preceded(space1, named_arg("h", int::<u32>)),
+                |h| Resize { width: None, height: Some(h) }
+            ),
+        )),
     )(input)
 }
 
@@ -216,21 +250,6 @@ impl ImageOp for Rot {
     fn apply(&self, stack: &mut ImageStack) {
         stack.rot(self.0);
     }
-}
-
-/// Scale both width and height by given multiplier.
-#[derive(Debug, Copy, Clone, PartialEq)]
-struct Scale(f32);
-
-impl ImageOp for Scale {
-    fn apply(&self, stack: &mut ImageStack) {
-        one_in_one_out(stack, |i| scale(i, self.0));
-    }
-}
-
-fn scale(image: &DynamicImage, scale: f32) -> DynamicImage {
-    let (w, h) = ((image.width() as f32 * scale) as u32, (image.height() as f32 * scale) as u32);
-    image.resize(w, h, image::imageops::FilterType::Lanczos3)
 }
 
 /// Apply a Gaussian blur with the given standard deviation.
@@ -806,6 +825,52 @@ fn translate(image: &DynamicImage, tx: i32, ty: i32) -> DynamicImage {
     }
 }
 
+/// Resize image to given dimensions. If only one of width or
+/// height is provided the target for the other dimension is chosen
+/// to preserve the image's aspect ratio.
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+struct Resize {
+    width: Option<u32>,
+    height: Option<u32>,
+}
+
+impl ImageOp for Resize {
+    fn apply(&self, stack: &mut ImageStack) {
+        one_in_one_out(stack, |i| resize(i, self));
+    }
+}
+
+fn resize(image: &DynamicImage, target: &Resize) -> DynamicImage {
+    let (w, h) = match (target.width, target.height) {
+        (Some(w), Some(h)) => (w, h),
+        (Some(w), None) => {
+            let h = ((w as f32 / image.width() as f32) * image.height() as f32) as u32;
+            (w, h)
+        }
+        (None, Some(h)) => {
+            let w = ((h as f32 / image.height() as f32) * image.width() as f32) as u32;
+            (w, h)
+        }
+        _ => panic!("Must provide at least one of target width or target height"),
+    };
+    image.resize(w, h, image::imageops::FilterType::Lanczos3)
+}
+
+/// Scale both width and height by given multiplier.
+#[derive(Debug, Copy, Clone, PartialEq)]
+struct Scale(f32);
+
+impl ImageOp for Scale {
+    fn apply(&self, stack: &mut ImageStack) {
+        one_in_one_out(stack, |i| scale(i, self.0));
+    }
+}
+
+fn scale(image: &DynamicImage, scale: f32) -> DynamicImage {
+    let (w, h) = ((image.width() as f32 * scale) as u32, (image.height() as f32 * scale) as u32);
+    image.resize(w, h, image::imageops::FilterType::Lanczos3)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -866,6 +931,41 @@ mod tests {
         );
     }
 
+    // TODO: the error messages from this parser are going to be pretty useless.
+    #[test]
+    fn test_parse_resize() {
+        // Need to provide at least one of width or height
+        assert_pipeline_parse_failure("resize");
+        // If providing only one parameter then need to specify
+        // whether it's width or height
+        assert_pipeline_parse_failure("resize 10");
+        // Providing both positional arguments
+        assert_pipeline_parse(
+            "resize 10 12",
+            &vec!["Resize { width: Some(10), height: Some(12) }"]
+        );
+        // Providing both named arguments
+        assert_pipeline_parse(
+            "resize w=10 h=12",
+            &vec!["Resize { width: Some(10), height: Some(12) }"]
+        );
+        // Providing both named arguments in opposite order
+        assert_pipeline_parse(
+            "resize h=12 w=10",
+            &vec!["Resize { width: Some(10), height: Some(12) }"]
+        );
+        // Width only
+        assert_pipeline_parse(
+            "resize w=10",
+            &vec!["Resize { width: Some(10), height: None }"]
+        );
+        // Height only
+        assert_pipeline_parse(
+            "resize h=12",
+            &vec!["Resize { width: None, height: Some(12) }"]
+        );
+    }
+
     #[test]
     fn test_parse_hcat() {
         // No width provided - default to 2
@@ -920,7 +1020,7 @@ mod tests {
     #[bench]
     fn bench_pipeline_parsing(b: &mut Bencher) {
         let pipeline = black_box(
-            "gray > func { 255 * (p > 100) } > rotate 45 > othresh > scale 2"
+            "gray > func { 255 * (p > 100) } > rotate 45 > othresh > scale 2 > resize w=7"
         );
         b.iter(|| {
             let pipeline = parse_pipeline(pipeline).unwrap();

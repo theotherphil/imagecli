@@ -5,7 +5,7 @@ use nom::{
     combinator::{map, map_res, opt},
     character::complete::{digit1, space0, space1},
     multi::separated_nonempty_list,
-    sequence::{delimited, preceded, tuple},
+    sequence::{delimited, pair, preceded, tuple},
 };
 
 /// Converts a parser that returns a T: SomeTrait to one that returns a Box<dyn SomeTrait>.
@@ -36,6 +36,20 @@ where
 /// Parses a integer value.
 pub fn int<T: std::str::FromStr>(input: &str) -> IResult<&str, T> {
     map_res(digit1, |s: &str| s.parse::<T>())(input)
+}
+
+/// Matches 'name=<arg>'.
+pub fn named_arg<'a, F, T>(
+    name: &'static str,
+    arg: F
+) -> impl Fn(&'a str) -> IResult<&'a str, T>
+where
+    F: Fn(&'a str) -> IResult<&'a str, T>
+{
+    preceded(
+        pair(tag(name), tag("=")),
+        arg
+    )
 }
 
 /// Parser for an operator which takes no args.

@@ -18,7 +18,6 @@ extern crate test;
 type ImageStack = stack::Stack<DynamicImage>;
 
 // TODO:
-//  - create (or use) a dynamic-map function to apply generic functions to DynamicImages
 //  - support different signatures in Array op
 //  - scale is extremely slow. Fix this.
 //  - example showing changing format of all images in a directory maching some pattern

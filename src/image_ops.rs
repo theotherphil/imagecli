@@ -215,6 +215,19 @@ fn parse_func2(input: &str) -> IResult<&str, Func2> {
     Ok((i, Func2 { text, expr }))
 }
 
+macro_rules! dynamic_map {
+    ($dynimage:expr, $func:expr) => {
+        match $dynimage {
+            DynamicImage::ImageLuma8(image) => DynamicImage::ImageLuma8($func(image)),
+            DynamicImage::ImageLumaA8(image) => DynamicImage::ImageLumaA8($func(image)),
+            DynamicImage::ImageRgb8(image) => DynamicImage::ImageRgb8($func(image)),
+            DynamicImage::ImageRgba8(image) => DynamicImage::ImageRgba8($func(image)),
+            DynamicImage::ImageBgr8(image) => DynamicImage::ImageBgr8($func(image)),
+            DynamicImage::ImageBgra8(image) => DynamicImage::ImageBgra8($func(image)),
+        }
+    }
+}
+
 fn one_in_one_out<F>(stack: &mut ImageStack, f: F)
 where
     F: FnOnce(&DynamicImage) -> DynamicImage
@@ -265,15 +278,7 @@ impl ImageOp for Gaussian {
 }
 
 fn gaussian(image: &DynamicImage, sigma: f32) -> DynamicImage {
-    use imageproc::filter::gaussian_blur_f32;
-    match image {
-        ImageLuma8(image) => ImageLuma8(gaussian_blur_f32(image, sigma)),
-        ImageLumaA8(image) => ImageLumaA8(gaussian_blur_f32(image, sigma)),
-        ImageRgb8(image) => ImageRgb8(gaussian_blur_f32(image, sigma)),
-        ImageRgba8(image) => ImageRgba8(gaussian_blur_f32(image, sigma)),
-        ImageBgr8(image) => ImageBgr8(gaussian_blur_f32(image, sigma)),
-        ImageBgra8(image) => ImageBgra8(gaussian_blur_f32(image, sigma)),
-    }
+    dynamic_map!(image, |i| imageproc::filter::gaussian_blur_f32(i, sigma))
 }
 
 /// Convert to grayscale.
@@ -376,17 +381,9 @@ impl ImageOp for Carve {
 }
 
 fn carve(image: &DynamicImage, ratio: f32) -> DynamicImage {
-    use imageproc::seam_carving::shrink_width;
     assert!(ratio <= 1.0);
     let target_width = (image.width() as f32 * ratio) as u32;
-    match image {
-        ImageLuma8(image) => ImageLuma8(shrink_width(image, target_width)),
-        ImageLumaA8(image) => ImageLumaA8(shrink_width(image, target_width)),
-        ImageRgb8(image) => ImageRgb8(shrink_width(image, target_width)),
-        ImageRgba8(image) => ImageRgba8(shrink_width(image, target_width)),
-        ImageBgr8(image) => ImageBgr8(shrink_width(image, target_width)),
-        ImageBgra8(image) => ImageBgra8(shrink_width(image, target_width)),
-    }
+    dynamic_map!(image, |i| imageproc::seam_carving::shrink_width(i, target_width))
 }
 
 /// Binarise the image using an adaptive thresholding with given block radius.
@@ -490,15 +487,7 @@ impl ImageOp for Median {
 }
 
 fn median(image: &DynamicImage, x_radius: u32, y_radius: u32) -> DynamicImage {
-    use imageproc::filter::median_filter;
-    match image {
-        ImageLuma8(image) => ImageLuma8(median_filter(image, x_radius, y_radius)),
-        ImageLumaA8(image) => ImageLumaA8(median_filter(image, x_radius, y_radius)),
-        ImageRgb8(image) => ImageRgb8(median_filter(image, x_radius, y_radius)),
-        ImageRgba8(image) => ImageRgba8(median_filter(image, x_radius, y_radius)),
-        ImageBgr8(image) => ImageBgr8(median_filter(image, x_radius, y_radius)),
-        ImageBgra8(image) => ImageBgra8(median_filter(image, x_radius, y_radius)),
-    }
+    dynamic_map!(image, |i| imageproc::filter::median_filter(i, x_radius, y_radius))
 }
 
 /// Applies the nth image operation to the nth element of the stack.
@@ -603,14 +592,7 @@ fn func(image: &DynamicImage, expr: &Expr) -> DynamicImage {
         let r = expr.evaluate(x as f32, y as f32, p as f32, 0.0);
         <u8 as Clamp<f32>>::clamp(r)
     };
-    match image {
-        ImageLuma8(image) => ImageLuma8(map_subpixels_with_coords(image, f)),
-        ImageLumaA8(image) => ImageLumaA8(map_subpixels_with_coords(image, f)),
-        ImageRgb8(image) => ImageRgb8(map_subpixels_with_coords(image, f)),
-        ImageRgba8(image) => ImageRgba8(map_subpixels_with_coords(image, f)),
-        ImageBgr8(image) => ImageBgr8(map_subpixels_with_coords(image, f)),
-        ImageBgra8(image) => ImageBgra8(map_subpixels_with_coords(image, f)),
-    }
+    dynamic_map!(image, |i| map_subpixels_with_coords(i, f))
 }
 
 /// User defined per-subpixel function, taking two input images.
@@ -815,16 +797,7 @@ impl ImageOp for Translate {
 }
 
 fn translate(image: &DynamicImage, tx: i32, ty: i32) -> DynamicImage {
-    use imageproc::geometric_transformations::translate;
-    let t = (tx, ty);
-    match image {
-        ImageLuma8(image) => ImageLuma8(translate(image, t)),
-        ImageLumaA8(image) => ImageLumaA8(translate(image, t)),
-        ImageRgb8(image) => ImageRgb8(translate(image, t)),
-        ImageRgba8(image) => ImageRgba8(translate(image, t)),
-        ImageBgr8(image) => ImageBgr8(translate(image, t)),
-        ImageBgra8(image) => ImageBgra8(translate(image, t)),
-    }
+    dynamic_map!(image, |i| imageproc::geometric_transformations::translate(i, (tx, ty)))
 }
 
 /// Resize image to given dimensions. If only one of width or
@@ -884,15 +857,7 @@ impl ImageOp for VFlip {
 }
 
 fn vflip(image: &DynamicImage) -> DynamicImage {
-    use image::imageops::flip_vertical;
-    match image {
-        ImageLuma8(image) => ImageLuma8(flip_vertical(image)),
-        ImageLumaA8(image) => ImageLumaA8(flip_vertical(image)),
-        ImageRgb8(image) => ImageRgb8(flip_vertical(image)),
-        ImageRgba8(image) => ImageRgba8(flip_vertical(image)),
-        ImageBgr8(image) => ImageBgr8(flip_vertical(image)),
-        ImageBgra8(image) => ImageBgra8(flip_vertical(image)),
-    }
+    dynamic_map!(image, image::imageops::flip_vertical)
 }
 
 /// Flip horiontally.
@@ -906,15 +871,7 @@ impl ImageOp for HFlip {
 }
 
 fn hflip(image: &DynamicImage) -> DynamicImage {
-    use image::imageops::flip_horizontal;
-    match image {
-        ImageLuma8(image) => ImageLuma8(flip_horizontal(image)),
-        ImageLumaA8(image) => ImageLumaA8(flip_horizontal(image)),
-        ImageRgb8(image) => ImageRgb8(flip_horizontal(image)),
-        ImageRgba8(image) => ImageRgba8(flip_horizontal(image)),
-        ImageBgr8(image) => ImageBgr8(flip_horizontal(image)),
-        ImageBgra8(image) => ImageBgra8(flip_horizontal(image)),
-    }
+    dynamic_map!(image, image::imageops::flip_horizontal)
 }
 
 #[cfg(test)]

@@ -132,20 +132,55 @@ where
     stack.push(result);
 }
 
-// TODO: this isn't object-safe, so a trait-based approach won't work.
-// TODO: Maybe I just want to add a parse method to the type, and generate a function that returns
-// TODO: a Description { type_name, usage, explanation } for this type.
-pub trait ImageOpParse : ImageOp {
-    fn usage() -> &'static str;
-    fn explanation() -> &'static str;
-    fn parse<'a>(input: &'a str) -> IResult<&'a str, Box<dyn ImageOp>>;
+pub fn documentation() -> Vec<Documentation> {
+    vec![
+        Array::documentation(),
+        AdaptiveThreshold::documentation(),
+        Blue::documentation(),
+        Carve::documentation(),
+        Circle::documentation(),
+        Const::documentation(),
+        Drop::documentation(),
+        Dup::documentation(),
+        Func::documentation(),
+        Func2::documentation(),
+        Gaussian::documentation(),
+        Gray::documentation(),
+        Green::documentation(),
+        Grid::documentation(),
+        HFlip::documentation(),
+        Id::documentation(),
+        Median::documentation(),
+        OtsuThreshold::documentation(),
+        Red::documentation(),
+        Resize::documentation(),
+        Rot::documentation(),
+        Rotate::documentation(),
+        Scale::documentation(),
+        Sobel::documentation(),
+        Translate::documentation(),
+        VFlip::documentation(),
+    ]
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Documentation {
+    operation: &'static str,
+    usage: &'static str,
+    explanation: &'static str,
 }
 
 macro_rules! impl_image_op_parse {
     ($name:ident, $usage:expr, $explanation:expr, $parse:expr) => {
-        impl ImageOpParse for $name {
-            fn usage() -> &'static str { $usage }
-            fn explanation() -> &'static str { $explanation }
+        impl $name {
+            fn documentation() -> Documentation {
+                Documentation {
+                    operation: stringify!($name),
+                    usage: $usage,
+                    explanation: $explanation,
+                }
+            }
+
             fn parse<'a>(input: &'a str) -> IResult<&'a str, Box<dyn ImageOp>> {
                 map_box!($parse)(input)
             }

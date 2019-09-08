@@ -6,7 +6,7 @@ use image::{DynamicImage, GenericImageView, open};
 
 mod stack;
 mod image_ops;
-use crate::image_ops::run_pipeline;
+use crate::image_ops::{run_pipeline, documentation};
 mod expr;
 mod error;
 use crate::error::Result;
@@ -37,25 +37,40 @@ type ImageStack = stack::Stack<DynamicImage>;
 
 #[derive(StructOpt, Debug)]
 struct Opt {
-    /// Verbose mode (-v, -vv, -vvv, etc.)
+    /// Verbose mode (-v, -vv, -vvv, etc.).
     #[structopt(short, long, parse(from_occurrences))]
     verbose: u8,
 
-    /// Input files
+    /// Input files.
     #[structopt(short, long, parse(from_os_str))]
     input: Vec<PathBuf>,
 
-    /// Output files
+    /// Output files.
     #[structopt(short, long, parse(from_os_str))]
     output: Vec<PathBuf>,
 
-    /// Image processing pipeline to apply
+    /// Image processing pipeline to apply.
     #[structopt(short, long)]
     pipeline: Option<String>,
+
+    /// Print documentation for the available pipeline operations.
+    #[structopt(long)]
+    print_ops: bool
 }
 
 fn main() -> Result<()> {
     let opt = Opt::from_args();
+
+    if opt.print_ops {
+        for docs in documentation().iter() {
+            println!( "---------------------------------");
+            println!( "Operation: {}", docs.operation);
+            println!( "Usage: {}", docs.usage);
+            println!( "---------------------------------");
+            println!( "{}", docs.explanation);
+        }
+    }
+
     let verbose = opt.verbose > 0;
 
     let inputs: Vec<(&PathBuf, DynamicImage)> = opt.input

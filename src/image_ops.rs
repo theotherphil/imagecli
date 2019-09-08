@@ -156,12 +156,12 @@ pub fn documentation() -> Vec<Documentation> {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Documentation {
-    operation: &'static str,
-    usage: &'static str,
-    explanation: &'static str,
+    pub operation: &'static str,
+    pub usage: &'static str,
+    pub explanation: &'static str,
 }
 
-macro_rules! impl_image_op_parse {
+macro_rules! impl_parse {
     ($name:ident, $usage:expr, $explanation:expr, $parse:expr) => {
         impl $name {
             fn documentation() -> Documentation {
@@ -224,7 +224,7 @@ impl ImageOp for AdaptiveThreshold {
     }
 }
 
-impl_image_op_parse!(
+impl_parse!(
     AdaptiveThreshold,
     "athresh <block_radius>",
     "Binarises an image using adaptive thresholding with the given block radius.",
@@ -253,7 +253,7 @@ impl ImageOp for Array {
     }
 }
 
-impl_image_op_parse!(
+impl_parse!(
     Array,
     "[<image_op>, .. ]",
     "Applies a series of image operations to the stack - the nth provided operation is applied \
@@ -280,7 +280,7 @@ impl ImageOp for Blue {
     }
 }
 
-impl_image_op_parse!(
+impl_parse!(
     Blue,
     "blue",
     "Extracts the blue channel from an image as a grayscale image.",
@@ -304,7 +304,7 @@ impl ImageOp for Carve {
     }
 }
 
-impl_image_op_parse!(
+impl_parse!(
     Carve,
     "carve <width_ratio>",
     "Reduces the width of an image to the given multiple of its original width via seam carving.",
@@ -360,7 +360,7 @@ fn draw_circle(image: DynamicImage, circle: &Circle) -> DynamicImage {
     ImageRgba8(image)
 }
 
-impl_image_op_parse!(
+impl_parse!(
     Circle,
     "circle <filltype> <cx> <cy> <radius> (color)",
     "Draws a circle on an image. filltype can be either 'hollow' or 'filled'. \
@@ -409,7 +409,7 @@ impl ImageOp for Const {
     }
 }
 
-impl_image_op_parse!(
+impl_parse!(
     Const,
     "const <width> <height> (color)",
     "Create an image with a single constant value. \
@@ -441,7 +441,7 @@ impl ImageOp for Drop {
     }
 }
 
-impl_image_op_parse!(
+impl_parse!(
     Drop,
     "DROP",
     "Discards the top element of the image stack.",
@@ -461,7 +461,7 @@ impl ImageOp for Dup {
     }
 }
 
-impl_image_op_parse!(
+impl_parse!(
     Dup,
     "DUP( <n>)?",
     "Duplicates the top element of the image stack n times. n defaults to 1 if not provided.",
@@ -503,7 +503,7 @@ fn parse_func(input: &str) -> IResult<&str, Func> {
     Ok((i, Func { text, expr }))
 }
 
-impl_image_op_parse!(
+impl_parse!(
     Func,
     "func { <fn> }",
     "Applies a user-provided function to each subpixel of an image.",
@@ -554,7 +554,7 @@ fn parse_func2(input: &str) -> IResult<&str, Func2> {
     Ok((i, Func2 { text, expr }))
 }
 
-impl_image_op_parse!(
+impl_parse!(
     Func2,
     "func2 { <fn> }",
     "Applies a user-provided function to each subpixel of a pair of images.",
@@ -576,7 +576,7 @@ impl ImageOp for Gaussian {
     }
 }
 
-impl_image_op_parse!(
+impl_parse!(
     Gaussian,
     "gaussian <standard_deviation>",
     "Applies a Gaussian blur with the specified standard deviation.",
@@ -604,7 +604,7 @@ fn gray(image: DynamicImage) -> DynamicImage {
     }
 }
 
-impl_image_op_parse!(
+impl_parse!(
     Gray,
     "gray",
     "Converts an image to grayscale.",
@@ -627,7 +627,7 @@ impl ImageOp for Green {
     }
 }
 
-impl_image_op_parse!(
+impl_parse!(
     Green,
     "green",
     "Extracts the green channel from an image as a grayscale image.",
@@ -689,7 +689,7 @@ fn grid(images: &[DynamicImage], cols: u32, rows: u32) -> DynamicImage {
     ImageRgba8(out)
 }
 
-impl_image_op_parse!(
+impl_parse!(
     Grid, // TODO: roll hcat and vcat aliases into the Grid parser
     "grid <columns> <rows>",
     "Arranges images into a grid. Aliases: 'hcat' is equivalent to 'Grid 2 1', 'hcat n' \
@@ -712,7 +712,7 @@ impl ImageOp for HFlip {
     }
 }
 
-impl_image_op_parse!(
+impl_parse!(
     HFlip,
     "hflip",
     "Flips an image horizontally.",
@@ -732,7 +732,7 @@ impl ImageOp for Id {
     }
 }
 
-impl_image_op_parse!(
+impl_parse!(
     Id,
     "id",
     "Applies the identity function, i.e. does nothing. This makes some pipelines more concise \
@@ -756,7 +756,7 @@ impl ImageOp for Median {
     }
 }
 
-impl_image_op_parse!(
+impl_parse!(
     Median,
     "median <x_radius> <y_radius>",
     "Applies a median filter with the given x radius and y radius.",
@@ -788,7 +788,7 @@ fn otsu_threshold(image: DynamicImage) -> DynamicImage {
     ImageLuma8(image)
 }
 
-impl_image_op_parse!(
+impl_parse!(
     OtsuThreshold,
     "othresh",
     "Binarises an image using Otsu thresholding.",
@@ -811,7 +811,7 @@ impl ImageOp for Red {
     }
 }
 
-impl_image_op_parse!(
+impl_parse!(
     Red,
     "red",
     "Extracts the red channel from an image as a grayscale image.",
@@ -882,7 +882,7 @@ fn parse_resize(input: &str) -> IResult<&str, Resize> {
     )(input)
 }
 
-impl_image_op_parse!(
+impl_parse!(
     Resize,
     "resize <width> <height>",
     "Resizes an image to the given dimensions. Also supports forms 'resize w=71', \
@@ -904,7 +904,7 @@ impl ImageOp for Rot {
     }
 }
 
-impl_image_op_parse!(
+impl_parse!(
     Rot,
     "ROT( <n>)?",
     "Rotates the top n elements of the stack by 1. n defaults to 3 if not provided. \
@@ -951,7 +951,7 @@ fn rotate(image: &DynamicImage, theta: f32) -> DynamicImage {
     }
 }
 
-impl_image_op_parse!(
+impl_parse!(
     Rotate,
     "rotate <angle>",
     "Rotates an image clockwise about its center by the given angle in degrees.",
@@ -973,7 +973,7 @@ impl ImageOp for Scale {
     }
 }
 
-impl_image_op_parse!(
+impl_parse!(
     Scale,
     "scale <ratio>",
     "Scales image width and height by tbe given multiplier.",
@@ -1019,7 +1019,7 @@ fn sobel(image: &DynamicImage) -> DynamicImage {
     }
 }
 
-impl_image_op_parse!(
+impl_parse!(
     Sobel,
     "sobel",
     "Computes image gradients using the Sobel filter.",
@@ -1043,7 +1043,7 @@ impl ImageOp for Translate {
     }
 }
 
-impl_image_op_parse!(
+impl_parse!(
     Translate,
     "translate <tx> <ty>",
     "Translates an image by (tx, ty). Positive values of tx move the image to the right, \
@@ -1065,7 +1065,7 @@ impl ImageOp for VFlip {
     }
 }
 
-impl_image_op_parse!(
+impl_parse!(
     VFlip,
     "vflip",
     "Flips an image vertically.",

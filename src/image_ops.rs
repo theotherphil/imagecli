@@ -90,20 +90,22 @@ fn parse_image_op(input: &str) -> IResult<&str, Box<dyn ImageOp>> {
             map_box!(op_zero("green", Green)),
             map_box!(op_two("grid", int::<u32>, int::<u32>, |w, h| Grid(w, h))),
             map_box!(op_one_opt("hcat", int::<u32>, |x| Grid(x.unwrap_or(2), 1))),
+            map_box!(op_zero("hflip", HFlip)),
             map_box!(op_zero("id", Id)),
             map_box!(op_two("median", int::<u32>, int::<u32>, |rx, ry| Median(rx, ry))),
             map_box!(op_zero("othresh", OtsuThreshold)),
             map_box!(op_zero("red", Red)),
             map_box!(parse_resize),
-            map_box!(op_one_opt("ROT", int::<usize>, |x| Rot(x.unwrap_or(3)))),
         )),
         alt((
+            map_box!(op_one_opt("ROT", int::<usize>, |x| Rot(x.unwrap_or(3)))),
             map_box!(op_one("rotate", float, |x| Rotate(x))),
             map_box!(op_one("scale", float, |x| Scale(x))),
             map_box!(op_zero("sobel", Sobel)),
             map_box!(op_zero("SWAP", Rot(2))),
             map_box!(op_two("translate", int::<i32>, int::<i32>, |tx, ty| Translate(tx, ty))),
             map_box!(op_one_opt("vcat", int::<u32>, |x| Grid(1, x.unwrap_or(2)))),
+            map_box!(op_zero("vflip", VFlip)),
         )),
     ))(input)
 }
@@ -869,6 +871,50 @@ impl ImageOp for Scale {
 fn scale(image: &DynamicImage, scale: f32) -> DynamicImage {
     let (w, h) = ((image.width() as f32 * scale) as u32, (image.height() as f32 * scale) as u32);
     image.resize(w, h, image::imageops::FilterType::Lanczos3)
+}
+
+/// Flip vertically.
+#[derive(Debug, Copy, Clone, PartialEq)]
+struct VFlip;
+
+impl ImageOp for VFlip {
+    fn apply(&self, stack: &mut ImageStack) {
+        one_in_one_out(stack, |i| vflip(i));
+    }
+}
+
+fn vflip(image: &DynamicImage) -> DynamicImage {
+    use image::imageops::flip_vertical;
+    match image {
+        ImageLuma8(image) => ImageLuma8(flip_vertical(image)),
+        ImageLumaA8(image) => ImageLumaA8(flip_vertical(image)),
+        ImageRgb8(image) => ImageRgb8(flip_vertical(image)),
+        ImageRgba8(image) => ImageRgba8(flip_vertical(image)),
+        ImageBgr8(image) => ImageBgr8(flip_vertical(image)),
+        ImageBgra8(image) => ImageBgra8(flip_vertical(image)),
+    }
+}
+
+/// Flip horiontally.
+#[derive(Debug, Copy, Clone, PartialEq)]
+struct HFlip;
+
+impl ImageOp for HFlip {
+    fn apply(&self, stack: &mut ImageStack) {
+        one_in_one_out(stack, |i| hflip(i));
+    }
+}
+
+fn hflip(image: &DynamicImage) -> DynamicImage {
+    use image::imageops::flip_horizontal;
+    match image {
+        ImageLuma8(image) => ImageLuma8(flip_horizontal(image)),
+        ImageLumaA8(image) => ImageLumaA8(flip_horizontal(image)),
+        ImageRgb8(image) => ImageRgb8(flip_horizontal(image)),
+        ImageRgba8(image) => ImageRgba8(flip_horizontal(image)),
+        ImageBgr8(image) => ImageBgr8(flip_horizontal(image)),
+        ImageBgra8(image) => ImageBgra8(flip_horizontal(image)),
+    }
 }
 
 #[cfg(test)]

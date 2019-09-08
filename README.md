@@ -113,3 +113,9 @@ cargo run --release -- -v -i images/robin.jpg -o images/18.png -p 'resize w=100'
 </pre>
 
 <img src="images/18.png" alt="Output"/>
+
+<pre>
+cargo run --release -- -v -i images/robin.jpg -o images/19.png -p 'DUP 2 > [id, hflip, vflip] > hcat 3'
+</pre>
+
+<img src="images/19.png" alt="Output"/>

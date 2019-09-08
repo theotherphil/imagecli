@@ -5,7 +5,7 @@ authors = ["theotherphil"]
 edition = "2018"
 
 [dependencies]
-image = "0.22.1"
+image = "0.22.2"
 imageproc = { path = "../imageproc" }
 structopt = "0.3"
 clap = "2.33.0"

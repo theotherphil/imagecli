@@ -18,26 +18,22 @@ extern crate test;
 type ImageStack = stack::Stack<DynamicImage>;
 
 // TODO:
+//  - write user guide
+//  - convert the readme examples into tests
 //  - support different signatures in Array op
 //  - scale is extremely slow. Fix this.
-//  - example showing changing format of all images in a directory maching some pattern
-//  - crop
-//  - add ability to add margins
-//  - add stages with optional parameters. e.g. rotate uses image centre by default, but user
-//      can specify a centre of rotation if they like
+//  - example showing changing format of all images in a directory matching some pattern
+//  - image::imageops::crop(img, x, y, w, h),
+//  - image::imageops::overlay(bottom, top, x, y),
+//  - add ability to add margins - need to be able to specify left, right, top, bottom
 //  - make performance less atrocious. Don't just clone everything all the time
 //  - add mask operation, and example of masking with a circle
 //  - add ability to handle entire pixels in user-defined funcs, not just subpixels.
 //    access via p.0, p.1, etc.? Write example rotating red green and blue channels
 //    rgb(p.1, p.2, p.0)
 //  - think about adding support for named parameters. check effect on perf (and compile times...)
-
-// functions provided by image::imageops:
-//  crop(img, x, y, w, h),
-//  resize (to new size), thumbnail - like resize but faster and worse quality
-//  flip_horizontal, flip_vertical, overlay(bottom, top, x, y),
-//  unsharpen(so maybe I should stop writing my own version for imageproc...)
-
+//  - support passing multiple images to a single pipeline or running an independent pipeline on each
+//    image. Add glob support for inputs (and make listing outputs work with this)
 
 #[derive(StructOpt, Debug)]
 struct Opt {

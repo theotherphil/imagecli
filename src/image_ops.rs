@@ -636,7 +636,6 @@ use image::{ImageBuffer, Pixel, Primitive};
 
 // Could add this to imageproc, but either way we should extend the syntax for custom functions
 // to support user-provided functions on entire pixels rather than just per channel.
-#[allow(deprecated)]
 fn map_subpixels_with_coords<I, P, F, S>(image: &I, f: F) -> Image<ChannelMap<P, S>>
 where
     I: GenericImage<Pixel = P>,
@@ -650,7 +649,7 @@ where
     for y in 0..height {
         for x in 0..width {
             let out_channels = out.get_pixel_mut(x, y).channels_mut();
-            for c in 0..P::channel_count() {
+            for c in 0..P::CHANNEL_COUNT {
                 out_channels[c as usize] = f(unsafe {
                     *image
                         .unsafe_get_pixel(x, y)
@@ -664,7 +663,6 @@ where
     out
 }
 
-#[allow(deprecated)]
 fn map_subpixels_with_coords2<I, P, S, F>(image1: &I, image2: &I, f: F) -> Image<ChannelMap<P, S>>
 where
     I: GenericImage<Pixel = P>,
@@ -682,7 +680,7 @@ where
     for y in 0..height {
         for x in 0..width {
             let out_channels = out.get_pixel_mut(x, y).channels_mut();
-            for c in 0..P::channel_count() {
+            for c in 0..P::CHANNEL_COUNT {
                 let p = unsafe {
                     *image1
                         .unsafe_get_pixel(x, y)

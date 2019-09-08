@@ -123,15 +123,6 @@ macro_rules! dynamic_map {
     }
 }
 
-fn one_in_one_out<F>(stack: &mut ImageStack, f: F)
-where
-    F: FnOnce(&DynamicImage) -> DynamicImage
-{
-    let image = stack.pop();
-    let result = f(&image);
-    stack.push(result);
-}
-
 pub fn documentation() -> Vec<Documentation> {
     vec![
         Array::documentation(),
@@ -226,13 +217,11 @@ struct AdaptiveThreshold(u32);
 
 impl ImageOp for AdaptiveThreshold {
     fn apply(&self, stack: &mut ImageStack) {
-        one_in_one_out(stack, |i| adaptive_threshold(i, self.0));
+        let gray = stack.pop().to_luma();
+        stack.push(
+            ImageLuma8(imageproc::contrast::adaptive_threshold(&gray, self.0))
+        );
     }
-}
-
-fn adaptive_threshold(image: &DynamicImage, block_radius: u32) -> DynamicImage {
-    let gray = image.to_luma();
-    ImageLuma8(imageproc::contrast::adaptive_threshold(&gray, block_radius))
 }
 
 impl_image_op_parse!(
@@ -284,14 +273,11 @@ struct Blue;
 
 impl ImageOp for Blue {
     fn apply(&self, stack: &mut ImageStack) {
-        one_in_one_out(stack, blue);
+        let rgb = stack.pop().to_rgb();
+        stack.push(
+            ImageLuma8(imageproc::map::blue_channel(&rgb))
+        );
     }
-}
-
-fn blue(image: &DynamicImage) -> DynamicImage {
-    use imageproc::map::blue_channel;
-    let rgb = image.to_rgb();
-    ImageLuma8(blue_channel(&rgb))
 }
 
 impl_image_op_parse!(
@@ -310,14 +296,12 @@ struct Carve(f32);
 
 impl ImageOp for Carve {
     fn apply(&self, stack: &mut ImageStack) {
-        one_in_one_out(stack, |i| carve(i, self.0));
+        use imageproc::seam_carving::shrink_width;
+        assert!(self.0 <= 1.0);
+        let image = stack.pop();
+        let target_width = (image.width() as f32 * self.0) as u32;
+        stack.push(dynamic_map!(&image, |i| shrink_width(i, target_width)));
     }
-}
-
-fn carve(image: &DynamicImage, ratio: f32) -> DynamicImage {
-    assert!(ratio <= 1.0);
-    let target_width = (image.width() as f32 * ratio) as u32;
-    dynamic_map!(image, |i| imageproc::seam_carving::shrink_width(i, target_width))
 }
 
 impl_image_op_parse!(
@@ -355,8 +339,7 @@ impl From<&str> for FillType {
 impl ImageOp for Circle {
     fn apply(&self, stack: &mut ImageStack) {
         let image = stack.pop();
-        let result = draw_circle(image, self);
-        stack.push(result);
+        stack.push(draw_circle(image, self));
     }
 }
 
@@ -415,16 +398,14 @@ struct Const {
 
 impl ImageOp for Const {
     fn apply(&self, stack: &mut ImageStack) {
-        one_in_one_out(stack, |_| constant(self));
-    }
-}
-
-fn constant(c: &Const) -> DynamicImage {
-    match c.color {
-        Color::Luma(l) => ImageLuma8(ImageBuffer::from_pixel(c.width, c.height, l)),
-        Color::LumaA(l) => ImageLumaA8(ImageBuffer::from_pixel(c.width, c.height, l)),
-        Color::Rgb(l) => ImageRgb8(ImageBuffer::from_pixel(c.width, c.height, l)),
-        Color::Rgba(l) => ImageRgba8(ImageBuffer::from_pixel(c.width, c.height, l)),
+        stack.pop();
+        let constant = match self.color {
+            Color::Luma(l) => ImageLuma8(ImageBuffer::from_pixel(self.width, self.height, l)),
+            Color::LumaA(l) => ImageLumaA8(ImageBuffer::from_pixel(self.width, self.height, l)),
+            Color::Rgb(l) => ImageRgb8(ImageBuffer::from_pixel(self.width, self.height, l)),
+            Color::Rgba(l) => ImageRgba8(ImageBuffer::from_pixel(self.width, self.height, l)),
+        };
+        stack.push(constant);
     }
 }
 
@@ -506,16 +487,15 @@ impl std::fmt::Debug for Func {
 
 impl ImageOp for Func {
     fn apply(&self, stack: &mut ImageStack) {
-        one_in_one_out(stack, |i| func(i, &self.expr));
+        let image = stack.pop();
+        let f = |p, x, y| {
+            let r = self.expr.evaluate(x as f32, y as f32, p as f32, 0.0);
+            <u8 as Clamp<f32>>::clamp(r)
+        };
+        stack.push(
+            dynamic_map!(&image, |i| map_subpixels_with_coords(i, f))
+        );
     }
-}
-
-fn func(image: &DynamicImage, expr: &Expr) -> DynamicImage {
-    let f = |p, x, y| {
-        let r = expr.evaluate(x as f32, y as f32, p as f32, 0.0);
-        <u8 as Clamp<f32>>::clamp(r)
-    };
-    dynamic_map!(image, |i| map_subpixels_with_coords(i, f))
 }
 
 fn parse_func(input: &str) -> IResult<&str, Func> {
@@ -590,12 +570,10 @@ struct Gaussian(f32);
 
 impl ImageOp for Gaussian {
     fn apply(&self, stack: &mut ImageStack) {
-        one_in_one_out(stack, |i| gaussian(i, self.0));
+        use imageproc::filter::gaussian_blur_f32;
+        let image = stack.pop();
+        stack.push(dynamic_map!(&image, |i| gaussian_blur_f32(i, self.0)));
     }
-}
-
-fn gaussian(image: &DynamicImage, sigma: f32) -> DynamicImage {
-    dynamic_map!(image, |i| imageproc::filter::gaussian_blur_f32(i, sigma))
 }
 
 impl_image_op_parse!(
@@ -615,8 +593,7 @@ struct Gray;
 impl ImageOp for Gray {
     fn apply(&self, stack: &mut ImageStack) {
         let image = stack.pop();
-        let result = gray(image);
-        stack.push(result);
+        stack.push(gray(image));
     }
 }
 
@@ -643,14 +620,11 @@ struct Green;
 
 impl ImageOp for Green {
     fn apply(&self, stack: &mut ImageStack) {
-        one_in_one_out(stack, green);
+        let rgb = stack.pop().to_rgb();
+        stack.push(
+            ImageLuma8(imageproc::map::green_channel(&rgb))
+        );
     }
-}
-
-fn green(image: &DynamicImage) -> DynamicImage {
-    use imageproc::map::green_channel;
-    let rgb = image.to_rgb();
-    ImageLuma8(green_channel(&rgb))
 }
 
 impl_image_op_parse!(
@@ -733,12 +707,9 @@ struct HFlip;
 
 impl ImageOp for HFlip {
     fn apply(&self, stack: &mut ImageStack) {
-        one_in_one_out(stack, |i| hflip(i));
+        let image = stack.pop();
+        stack.push(dynamic_map!(&image, image::imageops::flip_horizontal));
     }
-}
-
-fn hflip(image: &DynamicImage) -> DynamicImage {
-    dynamic_map!(image, image::imageops::flip_horizontal)
 }
 
 impl_image_op_parse!(
@@ -778,12 +749,11 @@ struct Median(u32, u32);
 
 impl ImageOp for Median {
     fn apply(&self, stack: &mut ImageStack) {
-        one_in_one_out(stack, |i| median(i, self.0, self.1));
+        let image = stack.pop();
+        stack.push(
+            dynamic_map!(&image, |i| imageproc::filter::median_filter(i, self.0, self.1))
+        );
     }
-}
-
-fn median(image: &DynamicImage, x_radius: u32, y_radius: u32) -> DynamicImage {
-    dynamic_map!(image, |i| imageproc::filter::median_filter(i, x_radius, y_radius))
 }
 
 impl_image_op_parse!(
@@ -803,8 +773,7 @@ struct OtsuThreshold;
 impl ImageOp for OtsuThreshold {
     fn apply(&self, stack: &mut ImageStack) {
         let image = stack.pop();
-        let result = otsu_threshold(image);
-        stack.push(result);
+        stack.push(otsu_threshold(image));
     }
 }
 
@@ -835,14 +804,11 @@ struct Red;
 
 impl ImageOp for Red {
     fn apply(&self, stack: &mut ImageStack) {
-        one_in_one_out(stack, red);
+        let rgb = stack.pop().to_rgb();
+        stack.push(
+            ImageLuma8(imageproc::map::red_channel(&rgb))
+        );
     }
-}
-
-fn red(image: &DynamicImage) -> DynamicImage {
-    use imageproc::map::red_channel;
-    let rgb = image.to_rgb();
-    ImageLuma8(red_channel(&rgb))
 }
 
 impl_image_op_parse!(
@@ -864,7 +830,8 @@ struct Resize {
 
 impl ImageOp for Resize {
     fn apply(&self, stack: &mut ImageStack) {
-        one_in_one_out(stack, |i| resize(i, self));
+        let image = stack.pop();
+        stack.push(resize(&image, self));
     }
 }
 
@@ -954,7 +921,8 @@ struct Rotate(f32);
 
 impl ImageOp for Rotate {
     fn apply(&self, stack: &mut ImageStack) {
-        one_in_one_out(stack, |i| rotate(i, self.0));
+        let image = stack.pop();
+        stack.push(rotate(&image, self.0));
     }
 }
 
@@ -999,13 +967,10 @@ struct Scale(f32);
 
 impl ImageOp for Scale {
     fn apply(&self, stack: &mut ImageStack) {
-        one_in_one_out(stack, |i| scale(i, self.0));
+        let image = stack.pop();
+        let (w, h) = ((image.width() as f32 * self.0) as u32, (image.height() as f32 * self.0) as u32);
+        stack.push(image.resize(w, h, image::imageops::FilterType::Lanczos3));
     }
-}
-
-fn scale(image: &DynamicImage, scale: f32) -> DynamicImage {
-    let (w, h) = ((image.width() as f32 * scale) as u32, (image.height() as f32 * scale) as u32);
-    image.resize(w, h, image::imageops::FilterType::Lanczos3)
 }
 
 impl_image_op_parse!(
@@ -1024,7 +989,8 @@ struct Sobel;
 
 impl ImageOp for Sobel {
     fn apply(&self, stack: &mut ImageStack) {
-        one_in_one_out(stack, |i| sobel(i));
+        let image = stack.pop();
+        stack.push(sobel(&image));
     }
 }
 
@@ -1069,12 +1035,12 @@ struct Translate(i32, i32);
 
 impl ImageOp for Translate {
     fn apply(&self, stack: &mut ImageStack) {
-        one_in_one_out(stack, |i| translate(i, self.0, self.1));
+        use imageproc::geometric_transformations::translate;
+        let image = stack.pop();
+        stack.push(
+            dynamic_map!(&image, |i| translate(i, (self.0, self.1)))
+        );
     }
-}
-
-fn translate(image: &DynamicImage, tx: i32, ty: i32) -> DynamicImage {
-    dynamic_map!(image, |i| imageproc::geometric_transformations::translate(i, (tx, ty)))
 }
 
 impl_image_op_parse!(
@@ -1094,12 +1060,9 @@ struct VFlip;
 
 impl ImageOp for VFlip {
     fn apply(&self, stack: &mut ImageStack) {
-        one_in_one_out(stack, |i| vflip(i));
+        let image = stack.pop();
+        stack.push(dynamic_map!(&image, image::imageops::flip_vertical));
     }
-}
-
-fn vflip(image: &DynamicImage) -> DynamicImage {
-    dynamic_map!(image, image::imageops::flip_vertical)
 }
 
 impl_image_op_parse!(

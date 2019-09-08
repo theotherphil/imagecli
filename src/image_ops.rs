@@ -75,144 +75,39 @@ fn parse_image_op(input: &str) -> IResult<&str, Box<dyn ImageOp>> {
     // Nested alts are required because alt only supports tuples with up 21 elements.
     alt((
         alt((
-            map_box!(parse_array),
-            map_box!(op_one("athresh", int::<u32>, |x| AdaptiveThreshold(x))),
-            map_box!(op_zero("blue", Blue)),
-            map_box!(op_one("carve", float, |x| Carve(x))),
-            map_box!(parse_circle),
-            map_box!(parse_const),
-            map_box!(op_zero("DROP", Drop)),
-            map_box!(op_one_opt("DUP", int::<usize>, |x| Dup(x.unwrap_or(1)))),
-            map_box!(parse_func),
-            map_box!(parse_func2),
-            map_box!(op_one("gaussian", float, |x| Gaussian(x))),
-            map_box!(op_zero("gray", Gray)),
-            map_box!(op_zero("green", Green)),
-            map_box!(op_two("grid", int::<u32>, int::<u32>, |w, h| Grid(w, h))),
+            Array::parse,
+            AdaptiveThreshold::parse,
+            Blue::parse,
+            Carve::parse,
+            Circle::parse,
+            Const::parse,
+            Drop::parse,
+            Dup::parse,
+            Func::parse,
+            Func2::parse,
+            Gaussian::parse,
+            Gray::parse,
+            Green::parse,
+            Grid::parse,
             map_box!(op_one_opt("hcat", int::<u32>, |x| Grid(x.unwrap_or(2), 1))),
-            map_box!(op_zero("hflip", HFlip)),
-            map_box!(op_zero("id", Id)),
-            map_box!(op_two("median", int::<u32>, int::<u32>, |rx, ry| Median(rx, ry))),
-            map_box!(op_zero("othresh", OtsuThreshold)),
-            map_box!(op_zero("red", Red)),
-            map_box!(parse_resize),
+            HFlip::parse,
+            Id::parse,
+            Median::parse,
+            OtsuThreshold::parse,
+            Red::parse,
+            Resize::parse,
         )),
         alt((
-            map_box!(op_one_opt("ROT", int::<usize>, |x| Rot(x.unwrap_or(3)))),
-            map_box!(op_one("rotate", float, |x| Rotate(x))),
-            map_box!(op_one("scale", float, |x| Scale(x))),
-            map_box!(op_zero("sobel", Sobel)),
+            Rot::parse,
+            Rotate::parse,
+            Scale::parse,
+            Sobel::parse,
             map_box!(op_zero("SWAP", Rot(2))),
-            map_box!(op_two("translate", int::<i32>, int::<i32>, |tx, ty| Translate(tx, ty))),
+            Translate::parse,
             map_box!(op_one_opt("vcat", int::<u32>, |x| Grid(1, x.unwrap_or(2)))),
-            map_box!(op_zero("vflip", VFlip)),
+            VFlip::parse,
         )),
     ))(input)
-}
-
-fn parse_array(input: &str) -> IResult<&str, Array> {
-    map(
-        delimited(tag("["), nonempty_sequence(",", parse_image_op), tag("]")),
-        |v| Array(v)
-    )(input)
-}
-
-// see test_parse_resize for usage
-fn parse_resize(input: &str) -> IResult<&str, Resize> {
-    preceded(
-        tag("resize"),
-        alt((
-            map(
-                tuple((
-                    preceded(space1, int::<u32>),
-                    preceded(space1, int::<u32>),
-                )),
-                |(w, h)| Resize { width: Some(w), height: Some(h) }
-            ),
-            map(
-                permutation((
-                    preceded(space1, named_arg("w", int::<u32>)),
-                    preceded(space1, named_arg("h", int::<u32>)),
-                )),
-                |(w, h)| Resize { width: Some(w), height: Some(h) }
-            ),
-            map(
-                preceded(space1, named_arg("w", int::<u32>)),
-                |w| Resize { width: Some(w), height: None}
-            ),
-            map(
-                preceded(space1, named_arg("h", int::<u32>)),
-                |h| Resize { width: None, height: Some(h) }
-            ),
-        )),
-    )(input)
-}
-
-// circle filltype cx cy radius (color)
-// Uses the same colour format as const
-fn parse_circle(input: &str) -> IResult<&str, Circle> {
-    map(
-        preceded(
-            tag("circle"),
-            tuple((
-                preceded(space1, alt((tag("filled"), tag("hollow")))),
-                pair(preceded(space1, int::<i32>), preceded(space1, int::<i32>)),
-                preceded(space1, int::<i32>),
-                preceded(space1, parse_color),
-            ))
-        ),
-        |(fill, center, radius, color)| Circle { fill: fill.into(), center, radius, color }
-    )(input)
-}
-
-fn parse_color(input: &str) -> IResult<&str, Color> {
-    map(
-        delimited(tag("("), nonempty_sequence(",", int::<u8>), tag(")")),
-        |vs| color_from_vals(&vs)
-    )(input)
-}
-
-// Luma:
-//  const 100 200 (10)
-// LumaA:
-//  const 100 200 (10, 20)
-// Rgb:
-//  const 100 200 (50, 90, 100)
-// Rgba:
-//  const 100 200 (50, 90, 40, 20)
-// Bgr and Bgra not supported
-fn parse_const(input: &str) -> IResult<&str, Const> {
-    map(
-        preceded(
-            tag("const"),
-            tuple((
-                preceded(space1, int::<u32>),
-                preceded(space1, int::<u32>),
-                preceded(space1, parse_color)
-            ))
-        ),
-        |(width, height, color)| Const { width, height, color }
-    )(input)
-}
-
-fn color_from_vals(vals: &[u8]) -> Color {
-    match vals.len() {
-        1 => Color::Luma(Luma([vals[0]])),
-        2 => Color::LumaA(LumaA([vals[0], vals[1]])),
-        3 => Color::Rgb(Rgb([vals[0], vals[1], vals[2]])),
-        4 => Color::Rgba(Rgba([vals[0], vals[1], vals[2], vals[3]])),
-        _ => panic!("Invalid color"),
-    }
-}
-
-fn parse_func(input: &str) -> IResult<&str, Func> {
-    let (i, (text, expr)) = crate::expr::parse_func(input, "func")?;
-    Ok((i, Func { text, expr }))
-}
-
-fn parse_func2(input: &str) -> IResult<&str, Func2> {
-    let (i, (text, expr)) = crate::expr::parse_func(input, "func2")?;
-    Ok((i, Func2 { text, expr }))
 }
 
 macro_rules! dynamic_map {
@@ -237,17 +132,290 @@ where
     stack.push(result);
 }
 
-/// Duplicates the top element of the stack n times.
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-struct Dup(usize);
+// TODO: this isn't object-safe, so a trait-based approach won't work.
+// TODO: Maybe I just want to add a parse method to the type, and generate a function that returns
+// TODO: a Description { type_name, usage, explanation } for this type.
+pub trait ImageOpParse : ImageOp {
+    fn usage() -> &'static str;
+    fn explanation() -> &'static str;
+    fn parse<'a>(input: &'a str) -> IResult<&'a str, Box<dyn ImageOp>>;
+}
 
-impl ImageOp for Dup {
-    fn apply(&self, stack: &mut ImageStack) {
-        stack.dup(self.0);
+macro_rules! impl_image_op_parse {
+    ($name:ident, $usage:expr, $explanation:expr, $parse:expr) => {
+        impl ImageOpParse for $name {
+            fn usage() -> &'static str { $usage }
+            fn explanation() -> &'static str { $explanation }
+            fn parse<'a>(input: &'a str) -> IResult<&'a str, Box<dyn ImageOp>> {
+                map_box!($parse)(input)
+            }
+        }
     }
 }
 
-/// Discards the top element of the stack.
+//-----------------------------------------------------------------------------
+// (Helper) Color
+//-----------------------------------------------------------------------------
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum Color {
+    Luma(Luma<u8>),
+    LumaA(LumaA<u8>),
+    Rgb(Rgb<u8>),
+    Rgba(Rgba<u8>),
+}
+
+fn parse_color(input: &str) -> IResult<&str, Color> {
+    map(
+        delimited(tag("("), nonempty_sequence(",", int::<u8>), tag(")")),
+        |vs| color_from_vals(&vs)
+    )(input)
+}
+
+fn color_from_vals(vals: &[u8]) -> Color {
+    match vals.len() {
+        1 => Color::Luma(Luma([vals[0]])),
+        2 => Color::LumaA(LumaA([vals[0], vals[1]])),
+        3 => Color::Rgb(Rgb([vals[0], vals[1], vals[2]])),
+        4 => Color::Rgba(Rgba([vals[0], vals[1], vals[2], vals[3]])),
+        _ => panic!("Invalid color"),
+    }
+}
+
+//-----------------------------------------------------------------------------
+// AdaptiveThreshold
+//-----------------------------------------------------------------------------
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+struct AdaptiveThreshold(u32);
+
+impl ImageOp for AdaptiveThreshold {
+    fn apply(&self, stack: &mut ImageStack) {
+        one_in_one_out(stack, |i| adaptive_threshold(i, self.0));
+    }
+}
+
+fn adaptive_threshold(image: &DynamicImage, block_radius: u32) -> DynamicImage {
+    let gray = image.to_luma();
+    ImageLuma8(imageproc::contrast::adaptive_threshold(&gray, block_radius))
+}
+
+impl_image_op_parse!(
+    AdaptiveThreshold,
+    "athresh <block_radius>",
+    "Binarises an image using adaptive thresholding with the given block radius.",
+    op_one("athresh", int::<u32>, |x| AdaptiveThreshold(x))
+);
+
+//-----------------------------------------------------------------------------
+// Array
+//-----------------------------------------------------------------------------
+
+/// TODO: handle image operations other than one-in-one-out.
+#[derive(Debug)]
+struct Array(Vec<Box<dyn ImageOp>>);
+
+impl ImageOp for Array {
+    fn apply(&self, stack: &mut ImageStack) {
+        let mut results = Vec::new();
+        for op in &self.0 {
+            // TODO: something less egregious
+            op.apply(stack);
+            results.push(stack.pop());
+        }
+        for result in results.into_iter().rev() {
+            stack.push(result);
+        }
+    }
+}
+
+impl_image_op_parse!(
+    Array,
+    "[<image_op>, .. ]",
+    "Applies a series of image operations to the stack - the nth provided operation is applied \
+    to the nth item in the stack.",
+    map(
+        delimited(tag("["), nonempty_sequence(",", parse_image_op), tag("]")),
+        |v| Array(v)
+    )
+);
+
+//-----------------------------------------------------------------------------
+// Blue
+//-----------------------------------------------------------------------------
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+struct Blue;
+
+impl ImageOp for Blue {
+    fn apply(&self, stack: &mut ImageStack) {
+        one_in_one_out(stack, blue);
+    }
+}
+
+fn blue(image: &DynamicImage) -> DynamicImage {
+    use imageproc::map::blue_channel;
+    let rgb = image.to_rgb();
+    ImageLuma8(blue_channel(&rgb))
+}
+
+impl_image_op_parse!(
+    Blue,
+    "blue",
+    "Extracts the blue channel from an image as a grayscale image.",
+    op_zero("blue", Blue)
+);
+
+//-----------------------------------------------------------------------------
+// Carve
+//-----------------------------------------------------------------------------
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+struct Carve(f32);
+
+impl ImageOp for Carve {
+    fn apply(&self, stack: &mut ImageStack) {
+        one_in_one_out(stack, |i| carve(i, self.0));
+    }
+}
+
+fn carve(image: &DynamicImage, ratio: f32) -> DynamicImage {
+    assert!(ratio <= 1.0);
+    let target_width = (image.width() as f32 * ratio) as u32;
+    dynamic_map!(image, |i| imageproc::seam_carving::shrink_width(i, target_width))
+}
+
+impl_image_op_parse!(
+    Carve,
+    "carve <width_ratio>",
+    "Reduces the width of an image to the given multiple of its original width via seam carving.",
+    op_one("carve", float, |x| Carve(x))
+);
+
+//-----------------------------------------------------------------------------
+// Circle
+//-----------------------------------------------------------------------------
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct Circle {
+    fill: FillType,
+    center: (i32, i32),
+    radius: i32,
+    color: Color,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+enum FillType { Filled, Hollow }
+
+impl From<&str> for FillType {
+    fn from(fill: &str) -> Self {
+        match fill {
+            "filled" => FillType::Filled,
+            "hollow" => FillType::Hollow,
+            _ => panic!("Invalid FillType"),
+        }
+    }
+}
+
+impl ImageOp for Circle {
+    fn apply(&self, stack: &mut ImageStack) {
+        let image = stack.pop();
+        let result = draw_circle(image, self);
+        stack.push(result);
+    }
+}
+
+fn draw_circle(image: DynamicImage, circle: &Circle) -> DynamicImage {
+    use imageproc::drawing::{draw_hollow_circle_mut, draw_filled_circle_mut};
+    // TODO: Handle formats properly - choose the "most general" color space.
+    let mut image = image.to_rgba();
+    let color = match circle.color {
+        Color::Luma(c) => c.to_rgba(),
+        Color::LumaA(c) => c.to_rgba(),
+        Color::Rgb(c) => c.to_rgba(),
+        Color::Rgba(c) => c.to_rgba(),
+    };
+    match circle.fill {
+        FillType::Filled => draw_filled_circle_mut(&mut image, circle.center, circle.radius, color),
+        FillType::Hollow => draw_hollow_circle_mut(&mut image, circle.center, circle.radius, color),
+    };
+    ImageRgba8(image)
+}
+
+impl_image_op_parse!(
+    Circle,
+    "circle <filltype> <cx> <cy> <radius> (color)",
+    "Draws a circle on an image. filltype can be either 'hollow' or 'filled'. \
+    color can be grayscale '(12)', grayscale with alpha '(12, 255)', RGB '(255, 0, 255)', \
+    or RGBA '(128, 128, 0, 255)'.",
+    map(
+        preceded(
+            tag("circle"),
+            tuple((
+                preceded(space1, alt((tag("filled"), tag("hollow")))),
+                pair(preceded(space1, int::<i32>), preceded(space1, int::<i32>)),
+                preceded(space1, int::<i32>),
+                preceded(space1, parse_color),
+            ))
+        ),
+        |(fill, center, radius, color)| Circle { fill: fill.into(), center, radius, color }
+    )
+);
+
+//-----------------------------------------------------------------------------
+// Const
+//-----------------------------------------------------------------------------
+
+// TODO: Over-writing with const means you have to do some awkward stack manipulation
+// TODO: if you want to combine the constant image with your inputs.
+// TODO: Maybe it would be better to allow constant images as 'pseudo-inputs', which get
+// TODO: injected at the start of the pipeline, rather than manipulating the existing stack.
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct Const {
+    width: u32,
+    height: u32,
+    color: Color,
+}
+
+impl ImageOp for Const {
+    fn apply(&self, stack: &mut ImageStack) {
+        one_in_one_out(stack, |_| constant(self));
+    }
+}
+
+fn constant(c: &Const) -> DynamicImage {
+    match c.color {
+        Color::Luma(l) => ImageLuma8(ImageBuffer::from_pixel(c.width, c.height, l)),
+        Color::LumaA(l) => ImageLumaA8(ImageBuffer::from_pixel(c.width, c.height, l)),
+        Color::Rgb(l) => ImageRgb8(ImageBuffer::from_pixel(c.width, c.height, l)),
+        Color::Rgba(l) => ImageRgba8(ImageBuffer::from_pixel(c.width, c.height, l)),
+    }
+}
+
+impl_image_op_parse!(
+    Const,
+    "const <width> <height> (color)",
+    "Create an image with a single constant value. \
+    color can be grayscale '(12)', grayscale with alpha '(12, 255)', RGB '(255, 0, 255)', \
+    or RGBA '(128, 128, 0, 255)'.",
+    map(
+        preceded(
+            tag("const"),
+            tuple((
+                preceded(space1, int::<u32>),
+                preceded(space1, int::<u32>),
+                preceded(space1, parse_color)
+            ))
+        ),
+        |(width, height, color)| Const { width, height, color }
+    )
+);
+
+//-----------------------------------------------------------------------------
+// Drop
+//-----------------------------------------------------------------------------
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 struct Drop;
 
@@ -257,17 +425,131 @@ impl ImageOp for Drop {
     }
 }
 
-/// Rotates the top n elements of the stack by 1.
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-struct Rot(usize);
+impl_image_op_parse!(
+    Drop,
+    "DROP",
+    "Discards the top element of the image stack.",
+    op_zero("DROP", Drop)
+);
 
-impl ImageOp for Rot {
+//-----------------------------------------------------------------------------
+// Dup
+//-----------------------------------------------------------------------------
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+struct Dup(usize);
+
+impl ImageOp for Dup {
     fn apply(&self, stack: &mut ImageStack) {
-        stack.rot(self.0);
+        stack.dup(self.0);
     }
 }
 
-/// Apply a Gaussian blur with the given standard deviation.
+impl_image_op_parse!(
+    Dup,
+    "DUP( <n>)?",
+    "Duplicates the top element of the image stack n times. n defaults to 1 if not provided.",
+    op_one_opt("DUP", int::<usize>, |x| Dup(x.unwrap_or(1)))
+);
+
+//-----------------------------------------------------------------------------
+// Func
+//-----------------------------------------------------------------------------
+
+struct Func {
+    /// The definition provided by the user, to use in logging.
+    text: String,
+    /// The expression to evalute per-subpixel.
+    expr: Expr,
+}
+
+impl std::fmt::Debug for Func {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Func({})", self.text)
+    }
+}
+
+impl ImageOp for Func {
+    fn apply(&self, stack: &mut ImageStack) {
+        one_in_one_out(stack, |i| func(i, &self.expr));
+    }
+}
+
+fn func(image: &DynamicImage, expr: &Expr) -> DynamicImage {
+    let f = |p, x, y| {
+        let r = expr.evaluate(x as f32, y as f32, p as f32, 0.0);
+        <u8 as Clamp<f32>>::clamp(r)
+    };
+    dynamic_map!(image, |i| map_subpixels_with_coords(i, f))
+}
+
+fn parse_func(input: &str) -> IResult<&str, Func> {
+    let (i, (text, expr)) = crate::expr::parse_func(input, "func")?;
+    Ok((i, Func { text, expr }))
+}
+
+impl_image_op_parse!(
+    Func,
+    "func { <fn> }",
+    "Applies a user-provided function to each subpixel of an image.",
+    parse_func
+);
+
+//-----------------------------------------------------------------------------
+// Func2
+//-----------------------------------------------------------------------------
+
+struct Func2 {
+    /// The definition provided by the user, to use in logging.
+    text: String,
+    /// The expression to evalute per-subpixel.
+    expr: Expr,
+}
+
+impl std::fmt::Debug for Func2 {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Func2({})", self.text)
+    }
+}
+
+impl ImageOp for Func2 {
+    fn apply(&self, stack: &mut ImageStack) {
+        let image1 = stack.pop();
+        let image2 = stack.pop();
+        let result = func2(&image1, &image2, &self.expr);
+        stack.push(result);
+    }
+}
+
+fn func2(image1: &DynamicImage, image2: &DynamicImage, expr: &Expr) -> DynamicImage {
+    let f = |p, q, x, y| {
+        let r = expr.evaluate(x as f32, y as f32, p as f32, q as f32);
+        <u8 as Clamp<f32>>::clamp(r)
+    };
+    // TODO: don't do unnecessary conversions everywhere. Rather than constantly converting
+    // TODO: between formats or adding elaborate format checking, maybe we should just do all
+    // TODO: calculations at RGBA.
+    let image1 = image1.to_rgba();
+    let image2 = image2.to_rgba();
+    ImageRgba8(map_subpixels_with_coords2(&image1, &image2, f))
+}
+
+fn parse_func2(input: &str) -> IResult<&str, Func2> {
+    let (i, (text, expr)) = crate::expr::parse_func(input, "func2")?;
+    Ok((i, Func2 { text, expr }))
+}
+
+impl_image_op_parse!(
+    Func2,
+    "func2 { <fn> }",
+    "Applies a user-provided function to each subpixel of a pair of images.",
+    parse_func2
+);
+
+//-----------------------------------------------------------------------------
+// Gaussian
+//-----------------------------------------------------------------------------
+
 #[derive(Debug, Copy, Clone, PartialEq)]
 struct Gaussian(f32);
 
@@ -281,7 +563,17 @@ fn gaussian(image: &DynamicImage, sigma: f32) -> DynamicImage {
     dynamic_map!(image, |i| imageproc::filter::gaussian_blur_f32(i, sigma))
 }
 
-/// Convert to grayscale.
+impl_image_op_parse!(
+    Gaussian,
+    "gaussian <standard_deviation>",
+    "Applies a Gaussian blur with the specified standard deviation.",
+    op_one("gaussian", float, |x| Gaussian(x))
+);
+
+//-----------------------------------------------------------------------------
+// Gray
+//-----------------------------------------------------------------------------
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 struct Gray;
 
@@ -300,131 +592,43 @@ fn gray(image: DynamicImage) -> DynamicImage {
     }
 }
 
- /// Rotate clockwise about the image's center by the given angle in degrees.
-#[derive(Debug, Copy, Clone, PartialEq)]
-struct Rotate(f32);
+impl_image_op_parse!(
+    Gray,
+    "gray",
+    "Converts an image to grayscale.",
+    op_zero("gray", Gray)
+);
 
-impl ImageOp for Rotate {
-    fn apply(&self, stack: &mut ImageStack) {
-        one_in_one_out(stack, |i| rotate(i, self.0));
-    }
-}
+//-----------------------------------------------------------------------------
+// Green
+//-----------------------------------------------------------------------------
 
-fn rotate(image: &DynamicImage, theta: f32) -> DynamicImage {
-    use imageproc::geometric_transformations::{Interpolation, rotate_about_center};
-    let rad = theta * std::f32::consts::PI / 180.0;
-    match image {
-        ImageLuma8(image) => ImageLuma8(
-            rotate_about_center(image, rad, Interpolation::Bilinear, Luma([0]))
-        ),
-        ImageLumaA8(image) => ImageLumaA8(
-            rotate_about_center(image, rad, Interpolation::Bilinear, LumaA([0, 0]))
-        ),
-        ImageRgb8(image) => ImageRgb8(
-            rotate_about_center(image, rad, Interpolation::Bilinear, Rgb([0, 0, 0]))
-        ),
-        ImageRgba8(image) => ImageRgba8(
-            rotate_about_center(image, rad, Interpolation::Bilinear, Rgba([0, 0, 0, 0]))
-        ),
-        ImageBgr8(image) => ImageBgr8(
-            rotate_about_center(image, rad, Interpolation::Bilinear, Bgr([0, 0, 0]))
-        ),
-        ImageBgra8(image) => ImageBgra8(
-            rotate_about_center(image, rad, Interpolation::Bilinear, Bgra([0, 0, 0, 0]))
-        ),
-    }
-}
-
-/// Compute image gradients using the Sobel filter.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-struct Sobel;
+struct Green;
 
-impl ImageOp for Sobel {
+impl ImageOp for Green {
     fn apply(&self, stack: &mut ImageStack) {
-        one_in_one_out(stack, |i| sobel(i));
+        one_in_one_out(stack, green);
     }
 }
 
-fn sobel(image: &DynamicImage) -> DynamicImage {
-    use imageproc::gradients::sobel_gradient_map;
-    let clamp_to_u8 = |x| { <u8 as Clamp<u16>>::clamp(x) };
-    match image {
-        ImageLuma8(image) => ImageLuma8(
-            sobel_gradient_map(image, |p| Luma([clamp_to_u8(p[0])]))
-        ),
-        ImageLumaA8(image) => ImageLuma8(
-            sobel_gradient_map(image, |p| Luma([clamp_to_u8(p[0])]))
-        ),
-        ImageRgb8(image) => ImageLuma8(
-            sobel_gradient_map(image, |p| Luma([clamp_to_u8(cmp::max(cmp::max(p[0], p[1]), p[2]))]))
-        ),
-        ImageRgba8(image) => ImageLuma8(
-            sobel_gradient_map(image, |p| Luma([clamp_to_u8(cmp::max(cmp::max(p[0], p[1]), p[2]))]))
-        ),
-        ImageBgr8(image) => ImageLuma8(
-            sobel_gradient_map(image, |p| Luma([clamp_to_u8(cmp::max(cmp::max(p[0], p[1]), p[2]))]))
-        ),
-        ImageBgra8(image) => ImageLuma8(
-            sobel_gradient_map(image, |p| Luma([clamp_to_u8(cmp::max(cmp::max(p[0], p[1]), p[2]))]))
-        ),
-    }
+fn green(image: &DynamicImage) -> DynamicImage {
+    use imageproc::map::green_channel;
+    let rgb = image.to_rgb();
+    ImageLuma8(green_channel(&rgb))
 }
 
-/// Apply seam carving to shrink the image to a provided multiple of its original width.
-#[derive(Debug, Copy, Clone, PartialEq)]
-struct Carve(f32);
+impl_image_op_parse!(
+    Green,
+    "green",
+    "Extracts the green channel from an image as a grayscale image.",
+    op_zero("green", Green)
+);
 
-impl ImageOp for Carve {
-    fn apply(&self, stack: &mut ImageStack) {
-        one_in_one_out(stack, |i| carve(i, self.0));
-    }
-}
+//-----------------------------------------------------------------------------
+// Grid
+//-----------------------------------------------------------------------------
 
-fn carve(image: &DynamicImage, ratio: f32) -> DynamicImage {
-    assert!(ratio <= 1.0);
-    let target_width = (image.width() as f32 * ratio) as u32;
-    dynamic_map!(image, |i| imageproc::seam_carving::shrink_width(i, target_width))
-}
-
-/// Binarise the image using an adaptive thresholding with given block radius.
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-struct AdaptiveThreshold(u32);
-
-impl ImageOp for AdaptiveThreshold {
-    fn apply(&self, stack: &mut ImageStack) {
-        one_in_one_out(stack, |i| adaptive_threshold(i, self.0));
-    }
-}
-
-fn adaptive_threshold(image: &DynamicImage, block_radius: u32) -> DynamicImage {
-    let gray = image.to_luma();
-    ImageLuma8(imageproc::contrast::adaptive_threshold(&gray, block_radius))
-}
-
-/// Binarise the image using Otsu thresholding.
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-struct OtsuThreshold;
-
-impl ImageOp for OtsuThreshold {
-    fn apply(&self, stack: &mut ImageStack) {
-        let image = stack.pop();
-        let result = otsu_threshold(image);
-        stack.push(result);
-    }
-}
-
-fn otsu_threshold(image: DynamicImage) -> DynamicImage {
-    use imageproc::contrast::{otsu_level, threshold_mut};
-    let mut image = match gray(image) {
-        ImageLuma8(i) => i,
-        _ => unreachable!(),
-    };
-    let level = otsu_level(&image);
-    threshold_mut(&mut image, level);
-    ImageLuma8(image)
-}
-
-/// Arrange images into a grid. First argument is the number of columns and second the number of rows.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 struct Grid(u32, u32);
 
@@ -476,7 +680,64 @@ fn grid(images: &[DynamicImage], cols: u32, rows: u32) -> DynamicImage {
     ImageRgba8(out)
 }
 
-/// Apply a median filter with the given x radius and y radius.
+impl_image_op_parse!(
+    Grid, // TODO: roll hcat and vcat aliases into the Grid parser
+    "grid <columns> <rows>",
+    "Arranges images into a grid. Aliases: 'hcat' is equivalent to 'Grid 2 1', 'hcat n' \
+    is equivalent to 'Grid n 1', 'vcat' is equivalent to 'Grid 1 2', 'vcat n' is equivalent \
+    to 'Grid 1 n'.",
+    op_two("grid", int::<u32>, int::<u32>, |w, h| Grid(w, h))
+);
+
+//-----------------------------------------------------------------------------
+// HFlip
+//-----------------------------------------------------------------------------
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+struct HFlip;
+
+impl ImageOp for HFlip {
+    fn apply(&self, stack: &mut ImageStack) {
+        one_in_one_out(stack, |i| hflip(i));
+    }
+}
+
+fn hflip(image: &DynamicImage) -> DynamicImage {
+    dynamic_map!(image, image::imageops::flip_horizontal)
+}
+
+impl_image_op_parse!(
+    HFlip,
+    "hflip",
+    "Flips an image horizontally.",
+    op_zero("hflip", HFlip)
+);
+
+//-----------------------------------------------------------------------------
+// Id
+//-----------------------------------------------------------------------------
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+struct Id;
+
+impl ImageOp for Id {
+    fn apply(&self, _: &mut ImageStack) {
+        // Do nothing
+    }
+}
+
+impl_image_op_parse!(
+    Id,
+    "id",
+    "Applies the identity function, i.e. does nothing. This makes some pipelines more concise \
+    to write.",
+    op_zero("id", Id)
+);
+
+//-----------------------------------------------------------------------------
+// Median
+//-----------------------------------------------------------------------------
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 struct Median(u32, u32);
 
@@ -490,26 +751,50 @@ fn median(image: &DynamicImage, x_radius: u32, y_radius: u32) -> DynamicImage {
     dynamic_map!(image, |i| imageproc::filter::median_filter(i, x_radius, y_radius))
 }
 
-/// Applies the nth image operation to the nth element of the stack.
-/// TODO: handle image operations other than one-in-one-out.
-#[derive(Debug)]
-struct Array(Vec<Box<dyn ImageOp>>);
+impl_image_op_parse!(
+    Median,
+    "median <x_radius> <y_radius>",
+    "Applies a median filter with the given x radius and y radius.",
+    op_two("median", int::<u32>, int::<u32>, |rx, ry| Median(rx, ry))
+);
 
-impl ImageOp for Array {
+//-----------------------------------------------------------------------------
+// OtsuThreshold
+//-----------------------------------------------------------------------------
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+struct OtsuThreshold;
+
+impl ImageOp for OtsuThreshold {
     fn apply(&self, stack: &mut ImageStack) {
-        let mut results = Vec::new();
-        for op in &self.0 {
-            // TODO: something less egregious
-            op.apply(stack);
-            results.push(stack.pop());
-        }
-        for result in results.into_iter().rev() {
-            stack.push(result);
-        }
+        let image = stack.pop();
+        let result = otsu_threshold(image);
+        stack.push(result);
     }
 }
 
-/// Extract the red channel from an image.
+fn otsu_threshold(image: DynamicImage) -> DynamicImage {
+    use imageproc::contrast::{otsu_level, threshold_mut};
+    let mut image = match gray(image) {
+        ImageLuma8(i) => i,
+        _ => unreachable!(),
+    };
+    let level = otsu_level(&image);
+    threshold_mut(&mut image, level);
+    ImageLuma8(image)
+}
+
+impl_image_op_parse!(
+    OtsuThreshold,
+    "othresh",
+    "Binarises an image using Otsu thresholding.",
+    op_zero("othresh", OtsuThreshold)
+);
+
+//-----------------------------------------------------------------------------
+// Red
+//-----------------------------------------------------------------------------
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 struct Red;
 
@@ -525,111 +810,273 @@ fn red(image: &DynamicImage) -> DynamicImage {
     ImageLuma8(red_channel(&rgb))
 }
 
-/// Extract the green channel from an image.
+impl_image_op_parse!(
+    Red,
+    "red",
+    "Extracts the red channel from an image as a grayscale image.",
+    op_zero("red", Red)
+);
+
+//-----------------------------------------------------------------------------
+// Resize
+//-----------------------------------------------------------------------------
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-struct Green;
+struct Resize {
+    width: Option<u32>,
+    height: Option<u32>,
+}
 
-impl ImageOp for Green {
+impl ImageOp for Resize {
     fn apply(&self, stack: &mut ImageStack) {
-        one_in_one_out(stack, green);
+        one_in_one_out(stack, |i| resize(i, self));
     }
 }
 
-fn green(image: &DynamicImage) -> DynamicImage {
-    use imageproc::map::green_channel;
-    let rgb = image.to_rgb();
-    ImageLuma8(green_channel(&rgb))
-}
-
-/// Extract the blue channel from an image.
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-struct Blue;
-
-impl ImageOp for Blue {
-    fn apply(&self, stack: &mut ImageStack) {
-        one_in_one_out(stack, blue);
-    }
-}
-
-fn blue(image: &DynamicImage) -> DynamicImage {
-    use imageproc::map::blue_channel;
-    let rgb = image.to_rgb();
-    ImageLuma8(blue_channel(&rgb))
-}
-
-/// The identity function. Sometimes helpful to make pipelines easier to write.
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-struct Id;
-
-impl ImageOp for Id {
-    fn apply(&self, _: &mut ImageStack) {
-        // Do nothing
-    }
-}
-
-/// User defined per-subpixel function.
-struct Func {
-    /// The definition provided by the user, to use in logging.
-    text: String,
-    /// The expression to evalute per-subpixel.
-    expr: Expr,
-}
-
-impl std::fmt::Debug for Func {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Func({})", self.text)
-    }
-}
-
-impl ImageOp for Func {
-    fn apply(&self, stack: &mut ImageStack) {
-        one_in_one_out(stack, |i| func(i, &self.expr));
-    }
-}
-
-fn func(image: &DynamicImage, expr: &Expr) -> DynamicImage {
-    let f = |p, x, y| {
-        let r = expr.evaluate(x as f32, y as f32, p as f32, 0.0);
-        <u8 as Clamp<f32>>::clamp(r)
+fn resize(image: &DynamicImage, target: &Resize) -> DynamicImage {
+    let (w, h) = match (target.width, target.height) {
+        (Some(w), Some(h)) => (w, h),
+        (Some(w), None) => {
+            let h = ((w as f32 / image.width() as f32) * image.height() as f32) as u32;
+            (w, h)
+        }
+        (None, Some(h)) => {
+            let w = ((h as f32 / image.height() as f32) * image.width() as f32) as u32;
+            (w, h)
+        }
+        _ => panic!("Must provide at least one of target width or target height"),
     };
-    dynamic_map!(image, |i| map_subpixels_with_coords(i, f))
+    image.resize(w, h, image::imageops::FilterType::Lanczos3)
 }
 
-/// User defined per-subpixel function, taking two input images.
-struct Func2 {
-    /// The definition provided by the user, to use in logging.
-    text: String,
-    /// The expression to evalute per-subpixel.
-    expr: Expr,
+// see test_parse_resize for usage
+fn parse_resize(input: &str) -> IResult<&str, Resize> {
+    preceded(
+        tag("resize"),
+        alt((
+            map(
+                tuple((
+                    preceded(space1, int::<u32>),
+                    preceded(space1, int::<u32>),
+                )),
+                |(w, h)| Resize { width: Some(w), height: Some(h) }
+            ),
+            map(
+                permutation((
+                    preceded(space1, named_arg("w", int::<u32>)),
+                    preceded(space1, named_arg("h", int::<u32>)),
+                )),
+                |(w, h)| Resize { width: Some(w), height: Some(h) }
+            ),
+            map(
+                preceded(space1, named_arg("w", int::<u32>)),
+                |w| Resize { width: Some(w), height: None}
+            ),
+            map(
+                preceded(space1, named_arg("h", int::<u32>)),
+                |h| Resize { width: None, height: Some(h) }
+            ),
+        )),
+    )(input)
 }
 
-impl std::fmt::Debug for Func2 {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Func2({})", self.text)
-    }
-}
+impl_image_op_parse!(
+    Resize,
+    "resize <width> <height>",
+    "Resizes an image to the given dimensions. Also supports forms 'resize w=71', \
+    'resize h=71', and 'resize w=17 h=21'. If only one of width or height is provided \
+    then the target for the other dimension is chosen to preserve the image's aspect ratio.",
+    parse_resize
+);
 
-impl ImageOp for Func2 {
+//-----------------------------------------------------------------------------
+// Rot
+//-----------------------------------------------------------------------------
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+struct Rot(usize);
+
+impl ImageOp for Rot {
     fn apply(&self, stack: &mut ImageStack) {
-        let image1 = stack.pop();
-        let image2 = stack.pop();
-        let result = func2(&image1, &image2, &self.expr);
-        stack.push(result);
+        stack.rot(self.0);
     }
 }
 
-fn func2(image1: &DynamicImage, image2: &DynamicImage, expr: &Expr) -> DynamicImage {
-    let f = |p, q, x, y| {
-        let r = expr.evaluate(x as f32, y as f32, p as f32, q as f32);
-        <u8 as Clamp<f32>>::clamp(r)
-    };
-    // TODO: don't do unnecessary conversions everywhere. Rather than constantly converting
-    // TODO: between formats or adding elaborate format checking, maybe we should just do all
-    // TODO: calculations at RGBA.
-    let image1 = image1.to_rgba();
-    let image2 = image2.to_rgba();
-    ImageRgba8(map_subpixels_with_coords2(&image1, &image2, f))
+impl_image_op_parse!(
+    Rot,
+    "ROT( <n>)?",
+    "Rotates the top n elements of the stack by 1. n defaults to 3 if not provided. \
+    Aliases: 'SWAP' is equivalent to 'ROT 2.",
+    op_one_opt("ROT", int::<usize>, |x| Rot(x.unwrap_or(3)))
+);
+
+//-----------------------------------------------------------------------------
+// Rotate
+//-----------------------------------------------------------------------------
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+struct Rotate(f32);
+
+impl ImageOp for Rotate {
+    fn apply(&self, stack: &mut ImageStack) {
+        one_in_one_out(stack, |i| rotate(i, self.0));
+    }
 }
+
+fn rotate(image: &DynamicImage, theta: f32) -> DynamicImage {
+    use imageproc::geometric_transformations::{Interpolation, rotate_about_center};
+    let rad = theta * std::f32::consts::PI / 180.0;
+    match image {
+        ImageLuma8(image) => ImageLuma8(
+            rotate_about_center(image, rad, Interpolation::Bilinear, Luma([0]))
+        ),
+        ImageLumaA8(image) => ImageLumaA8(
+            rotate_about_center(image, rad, Interpolation::Bilinear, LumaA([0, 0]))
+        ),
+        ImageRgb8(image) => ImageRgb8(
+            rotate_about_center(image, rad, Interpolation::Bilinear, Rgb([0, 0, 0]))
+        ),
+        ImageRgba8(image) => ImageRgba8(
+            rotate_about_center(image, rad, Interpolation::Bilinear, Rgba([0, 0, 0, 0]))
+        ),
+        ImageBgr8(image) => ImageBgr8(
+            rotate_about_center(image, rad, Interpolation::Bilinear, Bgr([0, 0, 0]))
+        ),
+        ImageBgra8(image) => ImageBgra8(
+            rotate_about_center(image, rad, Interpolation::Bilinear, Bgra([0, 0, 0, 0]))
+        ),
+    }
+}
+
+impl_image_op_parse!(
+    Rotate,
+    "rotate <angle>",
+    "Rotates an image clockwise about its center by the given angle in degrees.",
+    op_one("rotate", float, |x| Rotate(x))
+);
+
+//-----------------------------------------------------------------------------
+// Scale
+//-----------------------------------------------------------------------------
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+struct Scale(f32);
+
+impl ImageOp for Scale {
+    fn apply(&self, stack: &mut ImageStack) {
+        one_in_one_out(stack, |i| scale(i, self.0));
+    }
+}
+
+fn scale(image: &DynamicImage, scale: f32) -> DynamicImage {
+    let (w, h) = ((image.width() as f32 * scale) as u32, (image.height() as f32 * scale) as u32);
+    image.resize(w, h, image::imageops::FilterType::Lanczos3)
+}
+
+impl_image_op_parse!(
+    Scale,
+    "scale <ratio>",
+    "Scales image width and height by tbe given multiplier.",
+    op_one("scale", float, |x| Scale(x))
+);
+
+//-----------------------------------------------------------------------------
+// Sobel
+//-----------------------------------------------------------------------------
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+struct Sobel;
+
+impl ImageOp for Sobel {
+    fn apply(&self, stack: &mut ImageStack) {
+        one_in_one_out(stack, |i| sobel(i));
+    }
+}
+
+fn sobel(image: &DynamicImage) -> DynamicImage {
+    use imageproc::gradients::sobel_gradient_map;
+    let clamp_to_u8 = |x| { <u8 as Clamp<u16>>::clamp(x) };
+    match image {
+        ImageLuma8(image) => ImageLuma8(
+            sobel_gradient_map(image, |p| Luma([clamp_to_u8(p[0])]))
+        ),
+        ImageLumaA8(image) => ImageLuma8(
+            sobel_gradient_map(image, |p| Luma([clamp_to_u8(p[0])]))
+        ),
+        ImageRgb8(image) => ImageLuma8(
+            sobel_gradient_map(image, |p| Luma([clamp_to_u8(cmp::max(cmp::max(p[0], p[1]), p[2]))]))
+        ),
+        ImageRgba8(image) => ImageLuma8(
+            sobel_gradient_map(image, |p| Luma([clamp_to_u8(cmp::max(cmp::max(p[0], p[1]), p[2]))]))
+        ),
+        ImageBgr8(image) => ImageLuma8(
+            sobel_gradient_map(image, |p| Luma([clamp_to_u8(cmp::max(cmp::max(p[0], p[1]), p[2]))]))
+        ),
+        ImageBgra8(image) => ImageLuma8(
+            sobel_gradient_map(image, |p| Luma([clamp_to_u8(cmp::max(cmp::max(p[0], p[1]), p[2]))]))
+        ),
+    }
+}
+
+impl_image_op_parse!(
+    Sobel,
+    "sobel",
+    "Computes image gradients using the Sobel filter.",
+    op_zero("sobel", Sobel)
+);
+
+//-----------------------------------------------------------------------------
+// Translate
+//-----------------------------------------------------------------------------
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+struct Translate(i32, i32);
+
+impl ImageOp for Translate {
+    fn apply(&self, stack: &mut ImageStack) {
+        one_in_one_out(stack, |i| translate(i, self.0, self.1));
+    }
+}
+
+fn translate(image: &DynamicImage, tx: i32, ty: i32) -> DynamicImage {
+    dynamic_map!(image, |i| imageproc::geometric_transformations::translate(i, (tx, ty)))
+}
+
+impl_image_op_parse!(
+    Translate,
+    "translate <tx> <ty>",
+    "Translates an image by (tx, ty). Positive values of tx move the image to the right, \
+    and positive values of ty move it downwards.",
+    op_two("translate", int::<i32>, int::<i32>, |tx, ty| Translate(tx, ty))
+);
+
+//-----------------------------------------------------------------------------
+// VFlip
+//-----------------------------------------------------------------------------
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+struct VFlip;
+
+impl ImageOp for VFlip {
+    fn apply(&self, stack: &mut ImageStack) {
+        one_in_one_out(stack, |i| vflip(i));
+    }
+}
+
+fn vflip(image: &DynamicImage) -> DynamicImage {
+    dynamic_map!(image, image::imageops::flip_vertical)
+}
+
+impl_image_op_parse!(
+    VFlip,
+    "vflip",
+    "Flips an image vertically.",
+    op_zero("vflip", VFlip)
+);
+
+//-----------------------------------------------------------------------------
+// Mapping functions
+//-----------------------------------------------------------------------------
 
 use imageproc::{definitions::Image, map::{ChannelMap, WithChannel}};
 use image::{ImageBuffer, Pixel, Primitive};
@@ -699,177 +1146,6 @@ where
     }
 
     out
-}
-
-// TODO: Over-writing with const means you have to do some awkward stack manipulation
-// TODO: if you want to combine the constant image with your inputs.
-// TODO: Maybe it would be better to allow constant images as 'pseudo-inputs', which get
-// TODO: injected at the start of the pipeline, rather than manipulating the existing stack.
-
-/// Create an image with a single constant value.
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct Const {
-    width: u32,
-    height: u32,
-    color: Color,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-enum Color {
-    Luma(Luma<u8>),
-    LumaA(LumaA<u8>),
-    Rgb(Rgb<u8>),
-    Rgba(Rgba<u8>),
-}
-
-impl ImageOp for Const {
-    fn apply(&self, stack: &mut ImageStack) {
-        one_in_one_out(stack, |_| constant(self));
-    }
-}
-
-fn constant(c: &Const) -> DynamicImage {
-    match c.color {
-        Color::Luma(l) => ImageLuma8(ImageBuffer::from_pixel(c.width, c.height, l)),
-        Color::LumaA(l) => ImageLumaA8(ImageBuffer::from_pixel(c.width, c.height, l)),
-        Color::Rgb(l) => ImageRgb8(ImageBuffer::from_pixel(c.width, c.height, l)),
-        Color::Rgba(l) => ImageRgba8(ImageBuffer::from_pixel(c.width, c.height, l)),
-    }
-}
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-enum FillType { Filled, Hollow }
-
-impl From<&str> for FillType {
-    fn from(fill: &str) -> Self {
-        match fill {
-            "filled" => FillType::Filled,
-            "hollow" => FillType::Hollow,
-            _ => panic!("Invalid FillType"),
-        }
-    }
-}
-
-/// Draw a circle with the given center, radius, color, and fill type.
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct Circle {
-    fill: FillType,
-    center: (i32, i32),
-    radius: i32,
-    color: Color,
-}
-
-impl ImageOp for Circle {
-    fn apply(&self, stack: &mut ImageStack) {
-        let image = stack.pop();
-        let result = draw_circle(image, self);
-        stack.push(result);
-    }
-}
-
-fn draw_circle(image: DynamicImage, circle: &Circle) -> DynamicImage {
-    use imageproc::drawing::{draw_hollow_circle_mut, draw_filled_circle_mut};
-    // TODO: Handle formats properly - choose the "most general" color space.
-    let mut image = image.to_rgba();
-    let color = match circle.color {
-        Color::Luma(c) => c.to_rgba(),
-        Color::LumaA(c) => c.to_rgba(),
-        Color::Rgb(c) => c.to_rgba(),
-        Color::Rgba(c) => c.to_rgba(),
-    };
-    match circle.fill {
-        FillType::Filled => draw_filled_circle_mut(&mut image, circle.center, circle.radius, color),
-        FillType::Hollow => draw_hollow_circle_mut(&mut image, circle.center, circle.radius, color),
-    };
-    ImageRgba8(image)
-}
-
-/// Translate the image.
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-struct Translate(i32, i32);
-
-impl ImageOp for Translate {
-    fn apply(&self, stack: &mut ImageStack) {
-        one_in_one_out(stack, |i| translate(i, self.0, self.1));
-    }
-}
-
-fn translate(image: &DynamicImage, tx: i32, ty: i32) -> DynamicImage {
-    dynamic_map!(image, |i| imageproc::geometric_transformations::translate(i, (tx, ty)))
-}
-
-/// Resize image to given dimensions. If only one of width or
-/// height is provided the target for the other dimension is chosen
-/// to preserve the image's aspect ratio.
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-struct Resize {
-    width: Option<u32>,
-    height: Option<u32>,
-}
-
-impl ImageOp for Resize {
-    fn apply(&self, stack: &mut ImageStack) {
-        one_in_one_out(stack, |i| resize(i, self));
-    }
-}
-
-fn resize(image: &DynamicImage, target: &Resize) -> DynamicImage {
-    let (w, h) = match (target.width, target.height) {
-        (Some(w), Some(h)) => (w, h),
-        (Some(w), None) => {
-            let h = ((w as f32 / image.width() as f32) * image.height() as f32) as u32;
-            (w, h)
-        }
-        (None, Some(h)) => {
-            let w = ((h as f32 / image.height() as f32) * image.width() as f32) as u32;
-            (w, h)
-        }
-        _ => panic!("Must provide at least one of target width or target height"),
-    };
-    image.resize(w, h, image::imageops::FilterType::Lanczos3)
-}
-
-/// Scale both width and height by given multiplier.
-#[derive(Debug, Copy, Clone, PartialEq)]
-struct Scale(f32);
-
-impl ImageOp for Scale {
-    fn apply(&self, stack: &mut ImageStack) {
-        one_in_one_out(stack, |i| scale(i, self.0));
-    }
-}
-
-fn scale(image: &DynamicImage, scale: f32) -> DynamicImage {
-    let (w, h) = ((image.width() as f32 * scale) as u32, (image.height() as f32 * scale) as u32);
-    image.resize(w, h, image::imageops::FilterType::Lanczos3)
-}
-
-/// Flip vertically.
-#[derive(Debug, Copy, Clone, PartialEq)]
-struct VFlip;
-
-impl ImageOp for VFlip {
-    fn apply(&self, stack: &mut ImageStack) {
-        one_in_one_out(stack, |i| vflip(i));
-    }
-}
-
-fn vflip(image: &DynamicImage) -> DynamicImage {
-    dynamic_map!(image, image::imageops::flip_vertical)
-}
-
-/// Flip horiontally.
-#[derive(Debug, Copy, Clone, PartialEq)]
-struct HFlip;
-
-impl ImageOp for HFlip {
-    fn apply(&self, stack: &mut ImageStack) {
-        one_in_one_out(stack, |i| hflip(i));
-    }
-}
-
-fn hflip(image: &DynamicImage) -> DynamicImage {
-    dynamic_map!(image, image::imageops::flip_horizontal)
 }
 
 #[cfg(test)]

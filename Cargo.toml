@@ -1,0 +1,23 @@
+[package]
+name = "imagecli"
+version = "0.1.0"
+authors = ["theotherphil"]
+edition = "2018"
+
+[dependencies]
+image = "0.22.2"
+imageproc = "0.19.1"
+nom = "5.0.1"
+structopt = "0.3"
+
+[dev-dependencies]
+pretty_assertions = "0.6.1"
+
+[lib]
+name = "imagecli"
+path = "src/lib.rs"
+
+[[bin]]
+name = "imagecli"
+path = "src/main.rs"
+doc = false

@@ -13,6 +13,7 @@ exclude = ["images/*"]
 image = "0.22.2"
 imageproc = "0.19.1"
 nom = "5.0.1"
+snafu = "0.5.0"
 structopt = "0.3"
 
 [dev-dependencies]

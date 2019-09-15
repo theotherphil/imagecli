@@ -4,9 +4,10 @@ pub mod markdown;
 pub mod stack_diagram;
 pub mod template;
 
-use crate::error::Result;
+use crate::error::{IoError, Result};
 use crate::image_ops::documentation;
 use markdown::{find_headers, header, markdown_internal_link, markdown_table, Header};
+use snafu::ResultExt;
 use std::fmt::Write;
 use template::{parse_diagram, parse_example};
 
@@ -21,9 +22,19 @@ fn dir_name(section: &str) -> String {
 
 /// Reads README_template.md and writes README.md.
 pub fn generate_readme() -> Result<()> {
-    let template = std::fs::read_to_string("README_template.txt")?;
+    let read_path = "README_template.txt";
+    let write_path = "README.md";
+
+    let template = std::fs::read_to_string(read_path).context(IoError {
+        context: format!("Unable to read file '{}", read_path),
+    })?;
+
     let rendered = render_readme(&template)?;
-    std::fs::write("README.md", rendered)?;
+
+    std::fs::write(write_path, rendered).context(IoError {
+        context: format!("Unable to write to file '{}'", write_path),
+    })?;
+
     Ok(())
 }
 
@@ -65,7 +76,7 @@ fn render_readme(template: &str) -> Result<String> {
     }
 
     for example in &examples {
-        example.run();
+        example.run()?;
     }
 
     let mut operations = String::new();
@@ -98,7 +109,7 @@ fn render_readme(template: &str) -> Result<String> {
                     format!("{}_{}", docs.operation, count),
                 );
                 write!(operations, "{}", instantiated.render_for_documentation())?;
-                instantiated.run();
+                instantiated.run()?;
             }
         }
     }

@@ -1,4 +1,3 @@
-use imagecli::error::Result;
 use imagecli::{documentation::generate_readme, process};
 use std::path::PathBuf;
 use structopt::StructOpt;
@@ -26,12 +25,17 @@ struct Opt {
     generate_readme: bool,
 }
 
-fn main() -> Result<()> {
+fn main() {
     let opt = Opt::from_args();
 
-    if opt.generate_readme {
+    let result = if opt.generate_readme {
         generate_readme()
     } else {
         process(&opt.input, &opt.output, opt.pipeline, opt.verbose)
+    };
+
+    match result {
+        Ok(_) => {}
+        Err(e) => panic!("{}", e),
     }
 }

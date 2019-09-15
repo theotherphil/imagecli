@@ -1,3 +1,5 @@
+//! Defines the `ImageOp` trait, and all operations supported by this library.
+
 use crate::expr::Expr;
 use crate::example::Example;
 use crate::parse_utils::{int, named_arg, nonempty_sequence, op_one, op_one_opt, op_two, op_zero};
@@ -25,6 +27,8 @@ pub trait ImageOp: std::fmt::Debug {
     fn apply(&self, stack: &mut ImageStack) -> usize;
 }
 
+/// Parse a pipeline, panicking with a moderately useful message
+/// if parsing fails.
 pub fn parse(pipeline: &str) -> Vec<Box<dyn ImageOp>> {
     if pipeline.trim().is_empty() {
         return Vec::new();
@@ -103,6 +107,7 @@ fn parse_image_op(input: &str) -> IResult<&str, Box<dyn ImageOp>> {
     ))(input)
 }
 
+/// Returns documentation for all image ops in this file.
 pub fn documentation() -> Vec<Documentation> {
     vec![
         Array::documentation(),
@@ -135,11 +140,17 @@ pub fn documentation() -> Vec<Documentation> {
     ]
 }
 
+/// Documentation for an image operation.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Documentation {
+    /// The name of the operation.
     pub operation: &'static str,
+    /// Usage string for the operation - see README.md for the conventions used.
     pub usage: &'static str,
+    /// A human-readable explanation of what the operation does.
     pub explanation: &'static str,
+    /// Example pipelines using this operation. These are run and rendered
+    /// as part of generating README.md.
     pub examples: Vec<Example>,
 }
 
@@ -179,16 +190,24 @@ macro_rules! dynamic_map {
     };
 }
 
+/// The color spaces supported by this library.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum ColorSpace {
+    /// 8bpp grayscale.
     Luma8,
+    /// 8bpp grayscale with an alpha channel.
     LumaA8,
+    /// 8bpp RGB.
     Rgb8,
+    /// 8bpp RGB with an alpha channel.
     Rgba8,
+    /// 8bpp Bgr.
     Bgr8,
+    /// 8bpp BGR with an alpha channel.
     Bgra8,
 }
 
+/// Returns the `ColorSpace` of an image.
 pub fn color_space(image: &DynamicImage) -> ColorSpace {
     match image {
         DynamicImage::ImageLuma8(_) => ColorSpace::Luma8,

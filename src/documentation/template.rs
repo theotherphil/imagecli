@@ -42,6 +42,9 @@
 use crate::example::{Example, Style};
 use super::stack_diagram::{StackDiagram, StackDiagramStage};
 
+/// Parses a `$EXAMPLE(...)` from a template.
+/// Currently this is a bit clunky - it requires the opening line `$EXAMPLE(`
+/// to have already been consumed.
 pub fn parse_example<'a, I: Iterator<Item=&'a str>>(lines: &mut I) -> Example {
     let mut example = Example::new(1, 1, "");
     for line in lines {
@@ -76,6 +79,9 @@ pub fn parse_example<'a, I: Iterator<Item=&'a str>>(lines: &mut I) -> Example {
     example
 }
 
+/// Parses a `$STACK_DIAGRAM(...)` from a template.
+/// Currently this is a bit clunky - it requires the opening line `$STACK_DIAGRAM(`
+/// to have already been consumed.
 pub fn parse_diagram<'a, I: Iterator<Item=&'a str>>(lines: &mut I) -> StackDiagram {
     let mut stages = Vec::new();
     for line in lines {

@@ -1,3 +1,4 @@
+//! The standard error and result types used in this library.
 
 /// The standard result type used in this library.
 pub type Result<T> = std::result::Result<T, ImageCliError>;
@@ -5,8 +6,11 @@ pub type Result<T> = std::result::Result<T, ImageCliError>;
 /// A trivial wrapper for an Io, Fmt or image error.
 #[derive(Debug)]
 pub enum ImageCliError {
+    /// An image error.
     ImageError(image::ImageError),
+    /// An Io error.
     IoError(std::io::Error),
+    /// An error writing to a formatter.
     FmtError(std::fmt::Error),
 }
 

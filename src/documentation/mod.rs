@@ -15,6 +15,7 @@ fn dir_name(section: &str) -> String {
     section.trim().replace(",", "").replace(" ", "-").to_lowercase()
 }
 
+/// Reads README_template.md and writes README.md.
 pub fn generate_readme() -> Result<()> {
     let template = std::fs::read_to_string("README_template.txt")?;
     let rendered = render_readme(&template)?;
@@ -25,7 +26,7 @@ pub fn generate_readme() -> Result<()> {
 fn render_readme(template: &str) -> Result<String> {
     let mut result = String::new();
     let mut examples = Vec::new();
-    let mut current_section = Header { level: 0, content: "root".into() };
+    let mut current_section = Header { level: 0, title: "root".into() };
     let mut current_section_example_count = 0;
 
     let mut lines = template.lines();
@@ -35,7 +36,7 @@ fn render_readme(template: &str) -> Result<String> {
                 let example = parse_example(&mut lines);
                 let instantiated = example.instantiate(
                     "images".into(),
-                    format!("images/{}", dir_name(&current_section.content)),
+                    format!("images/{}", dir_name(&current_section.title)),
                     format!("ex{}", current_section_example_count),
                 );
                 write!(result, "{}", instantiated.render_for_documentation())?;
@@ -106,7 +107,7 @@ fn render_readme(template: &str) -> Result<String> {
         .filter(|h| (h.level >= min_level) && (h.level <= max_level))
     {
         let prefix = " ".repeat(2 * (header.level - min_level));
-        toc.push(format!("{} - {}", prefix, markdown_internal_link(&header.content)));
+        toc.push(format!("{} - {}", prefix, markdown_internal_link(&header.title)));
     }
 
     let toc = toc.join("\n");

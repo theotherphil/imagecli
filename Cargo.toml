@@ -3,6 +3,10 @@ name = "imagecli"
 version = "0.1.0"
 authors = ["theotherphil"]
 edition = "2018"
+repository = "https://github.com/theotherphil/imagecli.git"
+homepage = "https://github.com/theotherphil/imagecli"
+license = "MIT"
+exclude = ["images/*"]
 
 [dependencies]
 image = "0.22.2"

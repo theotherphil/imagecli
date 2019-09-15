@@ -383,6 +383,7 @@ Operation|Usage|Description
 [Carve](#carve)|`carve <width_ratio>`|Shrinks an image's width using seam carving.
 [Circle](#circle)|`circle <filltype> <cx> <cy> <radius> '('COLOR')'`|Draws a circle on an image.
 [Const](#const)|`const <width> <height> '('COLOR')'`|Creates an image with a single constant value.
+[Crop](#crop)|`crop <left> <top> <width> <height>`|Extracts a rectangular region from an image.
 [Dup](#dup)|`DUP [count]`|Duplicates the top element of the image stack `count` times. `count` defaults to 1 if not provided.
 [Func](#func)|`func { EXPR }`|Applies a user-provided function to each subpixel in an image.
 [Func2](#func2)|`func2 { EXPR }`|Applies a user-provided function pairwise to the subpixels in two images.
@@ -485,6 +486,20 @@ Creates an image with a single constant value.
 
 <pre>imagecli -i robin.png -o Const_0_0.png -p 'const 300 250 (255, 255, 0)'</pre>
 <img src='images/operations/Const_0_0.png'/>
+
+### Crop
+
+Usage: `crop <left> <top> <width> <height>`
+
+Extracts a rectangular region from an image.
+
+Returns a copy of the image region with inclusive top left point `(left, top)`
+and dimensions `(width, height)`.
+
+#### Examples
+
+<pre>imagecli -i robin.png -o Crop_0_0.png -p 'crop 10 50 100 150'</pre>
+<img src='images/operations/Crop_0_0.png'/>
 
 ### Dup
 

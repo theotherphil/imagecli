@@ -3,6 +3,7 @@ name = "imagecli"
 version = "0.1.0"
 authors = ["theotherphil"]
 edition = "2018"
+description = "A command line image processing tool."
 repository = "https://github.com/theotherphil/imagecli.git"
 homepage = "https://github.com/theotherphil/imagecli"
 license = "MIT"

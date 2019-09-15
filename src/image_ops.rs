@@ -367,7 +367,7 @@ impl_parse!(
     "carve <width_ratio>",
     "Shrinks an image's width using seam carving.
 
-`width_ratio` is required to a floating point number `<= 1.0`. The output image has width \
+`width_ratio` is required to be a floating point number `<= 1.0`. The output image has width \
 `width_ratio * input_image_width`.",
     op_one("carve", float, Carve),
     examples:
@@ -432,8 +432,8 @@ impl_parse!(
     "circle <filltype> <cx> <cy> <radius> '('COLOR')'",
     "Draws a circle on an image.
 
-`filltype` can be either 'hollow' or 'filled'. \
-color can be: grayscale: `(12)`, grayscale with alpha: `(12, 255)`, RGB: `(255, 0, 255)`, \
+`filltype` can be either `hollow` or `filled`. \
+`color` can be: grayscale: `(12)`, grayscale with alpha: `(12, 255)`, RGB: `(255, 0, 255)`, \
 or RGBA: `(128, 128, 0, 255)`.",
     map(
         preceded(
@@ -1094,7 +1094,7 @@ impl_parse!(
     "ROT [count]",
     "Rotates the top `count` elements of the stack by 1.
 
-`count` defaults to 3 if not provided. Aliases: 'SWAP' is equivalent to 'ROT 2.",
+`count` defaults to 3 if not provided. Aliases: `SWAP` is equivalent to `ROT 2`.",
     op_one_opt("ROT", int::<usize>, |x| Rot(x.unwrap_or(3)))
 );
 
@@ -1295,10 +1295,10 @@ impl ImageOp for Translate {
 impl_parse!(
     Translate,
     "translate <tx> <ty>",
-    "Translates an image by (tx, ty).
+    "Translates an image by `(tx, ty)`.
 
-Positive values of tx move the image to the right, \
-and positive values of ty move it downwards.",
+Positive values of `tx` move the image to the right, \
+and positive values of `ty` move it downwards.",
     op_two("translate", int::<i32>, int::<i32>, Translate),
     examples:
         Example::new(1, 1, "DUP > [translate 10 20, translate -10 -20] > hcat")

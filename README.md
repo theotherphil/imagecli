@@ -74,7 +74,7 @@ as operations mapping a single input to multiple outputs. This is handled via an
 stack: all input images are pushed onto the top of an image stack, and each operation pops one or
 more images from the top of the stack, applies some transformation, and pushes one or more output
 images back onto the stack. All images provided via the command line are pushed onto the image
-stack before we starting running the pipeline, and when the pipeline completes we save the contents
+stack before we start running the pipeline, and when the pipeline completes we save the contents
 of the image stack to the `--output` paths.
 
 ### Multiple inputs, single output
@@ -180,7 +180,8 @@ and pushing the result into a single step.)
 
 This may not be what you wanted! If you want to apply the `gaussian` operation to both of the two
 images in the stack you have two options. The verbose option uses the `SWAP` stack operation to
-manually swap the order of the two elements in the stack. `SWAP` is an alias for `ROT 2`, where the
+manually swap the order of the two elements in the stack. (The less verbose option uses an operation
+array, which is described later). `SWAP` is an alias for `ROT 2`, where the
 `ROT` operation rotates the positions of the top `n` elements of the stack - the top element moves
 `n` positions down the stack and the other the other top elements on the stack move up one.
 
@@ -266,7 +267,7 @@ inputs.
 ```
 
 As manually rotating through the image stack can be a bit verbose, we also support an array syntax
-which applies the nth in a series of operations to the nth element in the stack. For example,
+which applies the *n*th in a series of operations to the *n*th element in the stack. For example,
 the following command line applies a Gaussian blur to the first image, and a blur with larger
 radius to the second.
 
@@ -327,7 +328,7 @@ don't - you'll probably never have cause to use this behaviour!
 
 We provide limited support for user-defined functions via the `func`, `func2` and `func3`
 operations. These operations allow you to specify a function to run on each subpixel of an image.
-Functions are arithmetic expression defined in terms of the following components:
+Functions are arithmetic expressions defined in terms of the following components:
 * Binary arithmetic operators `+`, `-`, `/`, `*` and `^`.
 * Parentheses '(' and ')'.
 * Numerical constants, e.g. `4.0`.
@@ -401,7 +402,7 @@ Operation|Usage|Description
 [Scale](#scale)|`scale <ratio>`|Scales image width and height by `ratio`.
 [Sobel](#sobel)|`sobel`|Computes image gradients using the Sobel filter.
 [Threshold](#threshold)|`thresh`|Binarises an image using a user-defined threshold.
-[Translate](#translate)|`translate <tx> <ty>`|Translates an image by (tx, ty).
+[Translate](#translate)|`translate <tx> <ty>`|Translates an image by `(tx, ty)`.
 [VFlip](#vflip)|`vflip`|Flips an image vertically.
 
 
@@ -452,7 +453,7 @@ Usage: `carve <width_ratio>`
 
 Shrinks an image's width using seam carving.
 
-`width_ratio` is required to a floating point number `<= 1.0`. The output image has width `width_ratio * input_image_width`.
+`width_ratio` is required to be a floating point number `<= 1.0`. The output image has width `width_ratio * input_image_width`.
 
 #### Examples
 
@@ -465,7 +466,7 @@ Usage: `circle <filltype> <cx> <cy> <radius> '('COLOR')'`
 
 Draws a circle on an image.
 
-`filltype` can be either 'hollow' or 'filled'. color can be: grayscale: `(12)`, grayscale with alpha: `(12, 255)`, RGB: `(255, 0, 255)`, or RGBA: `(128, 128, 0, 255)`.
+`filltype` can be either `hollow` or `filled`. `color` can be: grayscale: `(12)`, grayscale with alpha: `(12, 255)`, RGB: `(255, 0, 255)`, or RGBA: `(128, 128, 0, 255)`.
 
 #### Examples
 
@@ -648,7 +649,7 @@ Usage: `ROT [count]`
 
 Rotates the top `count` elements of the stack by 1.
 
-`count` defaults to 3 if not provided. Aliases: 'SWAP' is equivalent to 'ROT 2.
+`count` defaults to 3 if not provided. Aliases: `SWAP` is equivalent to `ROT 2`.
 
 ### Rotate
 
@@ -700,9 +701,9 @@ Images are first converted to grayscale. Thresholds should be `>=0` and `< 256`.
 
 Usage: `translate <tx> <ty>`
 
-Translates an image by (tx, ty).
+Translates an image by `(tx, ty)`.
 
-Positive values of tx move the image to the right, and positive values of ty move it downwards.
+Positive values of `tx` move the image to the right, and positive values of `ty` move it downwards.
 
 #### Examples
 

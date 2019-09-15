@@ -106,7 +106,7 @@ fn render_readme(template: &str) -> Result<String> {
     let result = result.replace("$OPERATIONS", &operations);
 
     let headers = find_headers(&result);
-    let (min_level, max_level) = (2, 3);
+    let (min_level, max_level) = (2, 2);
 
     let mut toc = Vec::new();
     for header in headers

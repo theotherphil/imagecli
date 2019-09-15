@@ -2,7 +2,7 @@
 # Unreleased
 
 * Minor improvements to README.
-* Improve error reporting.
+* Improved error reporting.
 
 # 0.1.0 (2019-09-15)
 

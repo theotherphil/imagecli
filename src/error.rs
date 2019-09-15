@@ -1,4 +1,3 @@
-
 /// The standard result type used in this library.
 pub type Result<T> = std::result::Result<T, ImageCliError>;
 

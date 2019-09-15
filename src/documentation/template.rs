@@ -39,10 +39,10 @@
 //! are used to label transitions between stacks.
 //!
 
-use crate::example::{Example, Style};
 use super::stack_diagram::{StackDiagram, StackDiagramStage};
+use crate::example::{Example, Style};
 
-pub fn parse_example<'a, I: Iterator<Item=&'a str>>(lines: &mut I) -> Example {
+pub fn parse_example<'a, I: Iterator<Item = &'a str>>(lines: &mut I) -> Example {
     let mut example = Example::new(1, 1, "");
     for line in lines {
         if line.ends_with(")$") {
@@ -76,7 +76,7 @@ pub fn parse_example<'a, I: Iterator<Item=&'a str>>(lines: &mut I) -> Example {
     example
 }
 
-pub fn parse_diagram<'a, I: Iterator<Item=&'a str>>(lines: &mut I) -> StackDiagram {
+pub fn parse_diagram<'a, I: Iterator<Item = &'a str>>(lines: &mut I) -> StackDiagram {
     let mut stages = Vec::new();
     for line in lines {
         if line.ends_with(")$") {

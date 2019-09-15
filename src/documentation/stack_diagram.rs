@@ -1,11 +1,10 @@
-
 use std::fmt::Write;
 
 /// A diagram showing the evolution of the image stack
 /// as a pipeline is evaluated.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StackDiagram {
-    pub stages: Vec<StackDiagramStage>
+    pub stages: Vec<StackDiagramStage>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -60,7 +59,7 @@ mod tests {
                 StackDiagramStage::Transition("some operation".into()),
                 StackDiagramStage::Stack(vec!["C".into(), "B".into()]),
                 StackDiagramStage::Transition("save results".into()),
-            ]
+            ],
         };
         let expected = "```
     |

@@ -1,4 +1,3 @@
-
 /// A stack supporting basic manipulations required for
 /// stack-based programming.
 pub struct Stack<T> {

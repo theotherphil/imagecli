@@ -9,7 +9,7 @@ $TABLE_OF_CONTENTS
 
 ## Installation
 
-Either install using cargo, or clone this repo and built it locally.
+Either install using cargo, or clone this repo and build it locally.
 
 ```
 cargo install imagecli

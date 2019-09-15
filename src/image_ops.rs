@@ -4,7 +4,9 @@ use crate::{
     error::{ImageCliError, Result},
     example::Example,
     expr::Expr,
-    parse_utils::{int, named_arg, nonempty_sequence, op_one, op_one_opt, op_two, op_four, op_zero},
+    parse_utils::{
+        int, named_arg, nonempty_sequence, op_four, op_one, op_one_opt, op_two, op_zero,
+    },
     ImageStack,
 };
 use image::{
@@ -496,7 +498,6 @@ or RGBA: `(128, 128, 0, 255)`. Note that this consumes an image from the stack."
         Example::new(1, 1, "const 300 250 (255, 255, 0)")
 );
 
-
 //-----------------------------------------------------------------------------
 // Crop
 //-----------------------------------------------------------------------------
@@ -520,10 +521,10 @@ impl ImageOp for Crop {
 
 fn crop<I: GenericImage>(
     image: &mut I,
-    crop: &Crop
+    crop: &Crop,
 ) -> ImageBuffer<I::Pixel, Vec<<I::Pixel as Pixel>::Subpixel>>
 where
-    I: 'static
+    I: 'static,
 {
     image::imageops::crop(image, crop.left, crop.top, crop.width, crop.height).to_image()
 }

@@ -1,3 +1,10 @@
+//! A command line image processing tool, built on top of
+//! the [image] and [imageproc] crates.
+//!
+//! [image]: https://github.com/image-rs/image
+//! [imageproc]: https://github.com/image-rs/imageproc
+
+#![deny(missing_docs)]
 #![cfg_attr(test, feature(test))]
 #![allow(
     clippy::many_single_char_names,
@@ -22,6 +29,10 @@ mod stack;
 #[cfg(test)]
 extern crate test;
 
+/// An image stack. All image operations in this library
+/// operate on an image stack by popping zero or more images
+/// from it, computing zero or more results and pushing those
+/// back onto the stack.
 pub type ImageStack = stack::Stack<DynamicImage>;
 
 /// Load inputs, run the pipeline, and save the results.
@@ -69,6 +80,7 @@ pub fn process(
     Ok(())
 }
 
+/// Run an image processing pipeline on a stack with the given initial contents.
 pub fn run_pipeline(pipeline: &str, inputs: Vec<DynamicImage>, verbose: bool) -> Vec<DynamicImage> {
     let mut stack = ImageStack::new(inputs);
     let ops = parse(pipeline);

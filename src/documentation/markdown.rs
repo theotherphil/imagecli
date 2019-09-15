@@ -39,14 +39,20 @@ where
 /// A markdown header.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Header {
+    /// The level of the header - for example, ""## Foo" has level two.
     pub level: usize,
-    pub content: String,
+    /// The title of the header - the result of stripping leading # and whitespace.
+    pub title: String,
 }
 
+/// Finds header rows in a markdown file.
+/// Currently only recognises headers with leading #s.
 pub fn find_headers(contents: &str) -> Vec<Header> {
     contents.split("\n").filter_map(header).collect()
 }
 
+/// Checks whether a line in a markdown file is a header.
+/// Currently only recognises headers with leading #s.
 pub fn header(line: &str) -> Option<Header> {
     let mut count = 0;
     for char in line.chars().skip_while(|c| c.is_whitespace()) {
@@ -61,7 +67,7 @@ pub fn header(line: &str) -> Option<Header> {
     } else {
         Some(Header {
             level: count,
-            content: (&line[count..]).trim().into(),
+            title: (&line[count..]).trim().into(),
         })
     }
 }
@@ -107,14 +113,14 @@ mod tests {
             header("# Foo"),
             Some(Header {
                 level: 1,
-                content: "Foo".into()
+                title: "Foo".into()
             })
         );
         assert_eq!(
             header("## Foo"),
             Some(Header {
                 level: 2,
-                content: "Foo".into()
+                title: "Foo".into()
             })
         );
     }

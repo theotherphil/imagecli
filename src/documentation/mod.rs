@@ -19,6 +19,7 @@ fn dir_name(section: &str) -> String {
         .to_lowercase()
 }
 
+/// Reads README_template.md and writes README.md.
 pub fn generate_readme() -> Result<()> {
     let template = std::fs::read_to_string("README_template.txt")?;
     let rendered = render_readme(&template)?;
@@ -31,7 +32,7 @@ fn render_readme(template: &str) -> Result<String> {
     let mut examples = Vec::new();
     let mut current_section = Header {
         level: 0,
-        content: "root".into(),
+        title: "root".into(),
     };
     let mut current_section_example_count = 0;
 
@@ -42,7 +43,7 @@ fn render_readme(template: &str) -> Result<String> {
                 let example = parse_example(&mut lines);
                 let instantiated = example.instantiate(
                     "images".into(),
-                    format!("images/{}", dir_name(&current_section.content)),
+                    format!("images/{}", dir_name(&current_section.title)),
                     format!("ex{}", current_section_example_count),
                 );
                 write!(result, "{}", instantiated.render_for_documentation())?;
@@ -116,7 +117,7 @@ fn render_readme(template: &str) -> Result<String> {
         toc.push(format!(
             "{} - {}",
             prefix,
-            markdown_internal_link(&header.content)
+            markdown_internal_link(&header.title)
         ));
     }
 

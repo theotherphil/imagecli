@@ -1,15 +1,22 @@
+//! Support for rendering markdown diagrams showing the evolution of the
+//! image stack as a pipeline is evaluated.
+
 use std::fmt::Write;
 
 /// A diagram showing the evolution of the image stack
 /// as a pipeline is evaluated.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StackDiagram {
+    /// The stages to render, in order.
     pub stages: Vec<StackDiagramStage>,
 }
 
+/// A stage in a stack diagram.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum StackDiagramStage {
+    /// A desription of what occurs between one stack state and the next.
     Transition(String),
+    /// A list of the current stack contents.
     Stack(Vec<String>),
 }
 

@@ -1,17 +1,13 @@
 //! Types representing example pipelines to run, and functions to run them.
 
-use std::path::Path;
-use std::fmt::Write;
-use image::open;
 use crate::run_pipeline;
+use image::open;
+use std::fmt::Write;
+use std::path::Path;
 
 /// The default image file names to use as inputs for example pipelines.
 /// Pipelines with n inputs consume the first n images in this array.
-const DEFAULT_INPUTS: &[&str] = &[
-    "robin.png",
-    "robin_gray.png",
-    "yellow.png",
-];
+const DEFAULT_INPUTS: &[&str] = &["robin.png", "robin_gray.png", "yellow.png"];
 
 /// An example pipeline to run.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -61,8 +57,12 @@ impl Example {
                 .collect(),
         };
 
-        let ext = self.output_file_extension.as_ref().map(|e| e.as_str()).unwrap_or("png");
-        let output_file_names =  (0..self.num_outputs)
+        let ext = self
+            .output_file_extension
+            .as_ref()
+            .map(|e| e.as_str())
+            .unwrap_or("png");
+        let output_file_names = (0..self.num_outputs)
             .map(|c| format!("{}_{}.{}", output_root_name, c, ext))
             .collect();
 
@@ -96,7 +96,8 @@ impl InstantiatedExample {
             result,
             "<pre>{}</pre>",
             self.command_line_for_documentation()
-        ).unwrap();
+        )
+        .unwrap();
         for link in &self.output_paths() {
             writeln!(result, "<img src='{}'/>", link).unwrap();
         }

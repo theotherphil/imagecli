@@ -9,18 +9,22 @@ pub fn markdown_internal_link(section: &str) -> String {
 
 /// Name of the anchor github generate for a markdown section.
 fn markdown_anchor_name(section: &str) -> String {
-    section.trim().replace(",", "").replace(" ", "-").to_lowercase()
+    section
+        .trim()
+        .replace(",", "")
+        .replace(" ", "-")
+        .to_lowercase()
 }
 
 /// Writes a table for inclusion in github-flavoured-markdown file.
 pub fn markdown_table<'a, 'b, T: 'a, F, I>(
     header: &'b [&'static str],
     rows: I,
-    render_row: F
+    render_row: F,
 ) -> String
 where
-    I: Iterator<Item=&'a T>,
-    F: Fn(&'a T) -> Vec<String>
+    I: Iterator<Item = &'a T>,
+    F: Fn(&'a T) -> Vec<String>,
 {
     let mut table = String::new();
     writeln!(table, "{}", header.join("|")).unwrap();
@@ -75,8 +79,16 @@ mod tests {
             r: &'static str,
         }
         let rows = vec![
-            Row { l: "a00", m: "a01", r: "a02" },
-            Row { l: "a10", m: "a11", r: "a12" },
+            Row {
+                l: "a00",
+                m: "a01",
+                r: "a02",
+            },
+            Row {
+                l: "a10",
+                m: "a11",
+                r: "a12",
+            },
         ];
         assert_eq!(
             markdown_table(
@@ -90,17 +102,20 @@ mod tests {
 
     #[test]
     fn test_header() {
-        assert_eq!(
-            header("Foo"),
-            None
-        );
+        assert_eq!(header("Foo"), None);
         assert_eq!(
             header("# Foo"),
-            Some(Header { level: 1, content: "Foo".into() })
+            Some(Header {
+                level: 1,
+                content: "Foo".into()
+            })
         );
         assert_eq!(
             header("## Foo"),
-            Some(Header { level: 2, content: "Foo".into() })
+            Some(Header {
+                level: 2,
+                content: "Foo".into()
+            })
         );
     }
 

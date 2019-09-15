@@ -1,18 +1,22 @@
 //! Functions for generating documentation for this application.
 
 pub mod markdown;
-pub mod template;
 pub mod stack_diagram;
+pub mod template;
 
-use markdown::{Header, header, find_headers, markdown_internal_link, markdown_table};
-use template::{parse_diagram, parse_example};
 use crate::error::Result;
 use crate::image_ops::documentation;
+use markdown::{find_headers, header, markdown_internal_link, markdown_table, Header};
 use std::fmt::Write;
+use template::{parse_diagram, parse_example};
 
 /// Name of directory to use as output for examples in this section.
 fn dir_name(section: &str) -> String {
-    section.trim().replace(",", "").replace(" ", "-").to_lowercase()
+    section
+        .trim()
+        .replace(",", "")
+        .replace(" ", "-")
+        .to_lowercase()
 }
 
 pub fn generate_readme() -> Result<()> {
@@ -25,7 +29,10 @@ pub fn generate_readme() -> Result<()> {
 fn render_readme(template: &str) -> Result<String> {
     let mut result = String::new();
     let mut examples = Vec::new();
-    let mut current_section = Header { level: 0, content: "root".into() };
+    let mut current_section = Header {
+        level: 0,
+        content: "root".into(),
+    };
     let mut current_section_example_count = 0;
 
     let mut lines = template.lines();
@@ -41,11 +48,11 @@ fn render_readme(template: &str) -> Result<String> {
                 write!(result, "{}", instantiated.render_for_documentation())?;
                 examples.push(instantiated);
                 current_section_example_count += 1;
-            },
+            }
             "$STACK_DIAGRAM(" => {
                 let diagram = parse_diagram(&mut lines);
                 result.push_str(&diagram.render_for_markdown());
-            },
+            }
             _ => {
                 if let Some(header) = header(line) {
                     current_section = header;
@@ -70,9 +77,9 @@ fn render_readme(template: &str) -> Result<String> {
             vec![
                 markdown_internal_link(&doc.operation),
                 format!("`{}`", doc.usage.replace("|", "\\|")),
-                doc.explanation.split("\n").nth(0).unwrap().into()
+                doc.explanation.split("\n").nth(0).unwrap().into(),
             ]
-        }
+        },
     );
     writeln!(operations, "{}", operations_table)?;
 
@@ -106,7 +113,11 @@ fn render_readme(template: &str) -> Result<String> {
         .filter(|h| (h.level >= min_level) && (h.level <= max_level))
     {
         let prefix = " ".repeat(2 * (header.level - min_level));
-        toc.push(format!("{} - {}", prefix, markdown_internal_link(&header.content)));
+        toc.push(format!(
+            "{} - {}",
+            prefix,
+            markdown_internal_link(&header.content)
+        ));
     }
 
     let toc = toc.join("\n");

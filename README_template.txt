@@ -1,17 +1,21 @@
 # imagecli
 
+[![crates.io](https://img.shields.io/crates/v/imagecli.svg)](https://crates.io/crates/imagecli)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/theotherphil/imagecli/blob/master/LICENSE.md)
 
 A command line image processing tool, built on top of [image] and [imageproc].
 
 $TABLE_OF_CONTENTS
 
-This application applies a series of operations to one or more input images and produces one or
-more output images.
+## Installation
 
-Throughout this documentation we will use the following image as input:
+Either install using cargo, or clone this repo and built it locally.
 
-<img src='images/robin.png' alt='robin.png'/>
+```
+cargo install imagecli
+```
+
+There are currently no pre-built binaries available.
 
 ## Basic usage
 

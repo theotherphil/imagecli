@@ -59,7 +59,7 @@ And the following rotates an image about its center by 45 degrees.
 
 ## Multi-stage pipelines
 
-You can apply multi operations in a row by chaining them together using `>`. For example, the
+You can apply multiple operations in a row by chaining them together using `>`. For example, the
 following pipeline converts an image to grayscale, rotates it by 30 degrees, and then computes
 its gradient using the Sobel filter.
 
@@ -69,22 +69,23 @@ its gradient using the Sobel filter.
 ## The image stack
 
 All of the pipelines shown thus far have taken a single image as input and produced a single image
-as output. However, we support operations mapping multiple inputs to a single output, as well
+as output. However, we also support operations mapping multiple inputs to a single output, as well
 as operations mapping a single input to multiple outputs. This is handled via an implicit image
 stack: all input images are pushed onto the top of an image stack, and each operation pops one or
 more images from the top of the stack, applies some transformation, and pushes one or more output
 images back onto the stack. All images provided via the command line are pushed onto the image
-stack before we starting running the pipeline, and when the pipeline completes we walk along
-the list of output paths in parallel to the images remaining in the stack, saving each image to
-the provided path.
+stack before we starting running the pipeline, and when the pipeline completes we save the contents
+of the image stack to the `--output` paths.
 
 ### Multiple inputs, single output
 
-The following command line takes two images as input, and applies the `hcat` operator, which
+The following command line takes two images as input and applies the `hcat` operation, which
 horizontally concatenates a pair of images.
 
 <pre>imagecli -i robin.png robin_gray.png -o ex0_0.png -p 'hcat'</pre>
 <img src='images/multiple-inputs-single-output/ex0_0.png'/>
+
+The diagram below shows the state of the image stack as this pipeline is run.
 
 ```
     |
@@ -113,11 +114,11 @@ horizontally concatenates a pair of images.
 ### Single input, multiple outputs
 
 There aren't currently any image processing operations that produce multiple outputs from a
-single input. However, pipelines can specify `stack operations` that directly manipulate the
-image stack. These all have upper case names to make it easier to distinguish between image
+single input. However, pipelines can also contain stack operations - operations that directly
+manipulate the image stack. These all have upper case names to make it easier to distinguish between image
 processing operations and stack operations.
 
-For example, the `DUP` operator duplicates the top element of the stack. The following example
+For example, the `DUP` operation duplicates the top element of the stack. The following example
 loads a single image and then saves two copies of it.
 
 <pre>imagecli -i robin.png -o ex0_0.png ex0_1.png -p 'DUP'</pre>
@@ -178,9 +179,9 @@ and pushing the result into a single step.)
 ```
 
 This may not be what you wanted! If you want to apply the `gaussian` operation to both of the two
-images in the stack you have two options. The verbose option uses the `SWAP` stack operator to
+images in the stack you have two options. The verbose option uses the `SWAP` stack operation to
 manually swap the order of the two elements in the stack. `SWAP` is an alias for `ROT 2`, where the
-`ROT` operator rotates the positions of the top `n` elements of the stack - the top element moves
+`ROT` operation rotates the positions of the top `n` elements of the stack - the top element moves
 `n` positions down the stack and the other the other top elements on the stack move up one.
 
 ```
@@ -275,13 +276,13 @@ radius to the second.
 
 The description above assumes that each operation in the array consumes a single input and produces
 a single result. Array operations are actually more general than this, as the operations within
-them may consume more than one input or produce more than one result. In this case each operator
-is applied to the stack in turn, and the results pushed by each operator are popped into temporary
-storage before applying the next operator. Finally, all of the results are pushed to the stack.
+them may consume more than one input or produce more than one result. In this case each operation
+is applied to the stack in turn, and the results pushed by each operation are popped into temporary
+storage before applying the next. Finally, all of the results are pushed to the stack.
 `DUP n` is treated as consuming 1 image and creating `n + 1` results, and `ROT n` is always treated
 as producing no outputs.
 
-If this explanation isn't clear then work through the stack diagram for the example below. Or
+If this explanation isn't clear then look through the stack diagram for the example below. Or
 don't - you'll probably never have cause to use this behaviour!
 
 <pre>imagecli -i yellow.png robin.png robin_gray.png -o ex3_0.png -p '[DUP, hcat] > [vcat, id] > hcat'</pre>
@@ -325,7 +326,7 @@ don't - you'll probably never have cause to use this behaviour!
 ## User-defined functions
 
 We provide limited support for user-defined functions via the `func`, `func2` and `func3`
-operators. These operators allow you to specify a function to run on each subpixel of an image.
+operations. These operations allow you to specify a function to run on each subpixel of an image.
 Functions are arithmetic expression defined in terms of the following components:
 * Binary arithmetic operators `+`, `-`, `/`, `*` and `^`.
 * Parentheses '(' and ')'.

@@ -74,7 +74,7 @@ as operations mapping a single input to multiple outputs. This is handled via an
 stack: all input images are pushed onto the top of an image stack, and each operation pops one or
 more images from the top of the stack, applies some transformation, and pushes one or more output
 images back onto the stack. All images provided via the command line are pushed onto the image
-stack before we starting running the pipeline, and when the pipeline completes we save the contents
+stack before we start running the pipeline, and when the pipeline completes we save the contents
 of the image stack to the `--output` paths.
 
 ### Multiple inputs, single output
@@ -148,7 +148,8 @@ $STACK_DIAGRAM(
 
 This may not be what you wanted! If you want to apply the `gaussian` operation to both of the two
 images in the stack you have two options. The verbose option uses the `SWAP` stack operation to
-manually swap the order of the two elements in the stack. `SWAP` is an alias for `ROT 2`, where the
+manually swap the order of the two elements in the stack. (The less verbose option uses an operation
+array, which is described later). `SWAP` is an alias for `ROT 2`, where the
 `ROT` operation rotates the positions of the top `n` elements of the stack - the top element moves
 `n` positions down the stack and the other the other top elements on the stack move up one.
 
@@ -187,7 +188,7 @@ $STACK_DIAGRAM(
 )$
 
 As manually rotating through the image stack can be a bit verbose, we also support an array syntax
-which applies the nth in a series of operations to the nth element in the stack. For example,
+which applies the *n*th in a series of operations to the *n*th element in the stack. For example,
 the following command line applies a Gaussian blur to the first image, and a blur with larger
 radius to the second.
 
@@ -230,7 +231,7 @@ $STACK_DIAGRAM(
 
 We provide limited support for user-defined functions via the `func`, `func2` and `func3`
 operations. These operations allow you to specify a function to run on each subpixel of an image.
-Functions are arithmetic expression defined in terms of the following components:
+Functions are arithmetic expressions defined in terms of the following components:
 * Binary arithmetic operators `+`, `-`, `/`, `*` and `^`.
 * Parentheses '(' and ')'.
 * Numerical constants, e.g. `4.0`.

@@ -6,41 +6,12 @@
 A command line image processing tool, built on top of [image] and [imageproc].
 
  - [Installation](#installation)
+ - [Contributing](#contributing)
  - [Basic usage](#basic-usage)
  - [Multi-stage pipelines](#multi-stage-pipelines)
  - [The image stack](#the-image-stack)
-   - [Multiple inputs, single output](#multiple-inputs-single-output)
-   - [Single input, multiple outputs](#single-input-multiple-outputs)
-   - [Multiple inputs, multiple outputs](#multiple-inputs-multiple-outputs)
  - [User-defined functions](#user-defined-functions)
  - [Operations](#operations)
-   - [Array](#array)
-   - [AdaptiveThreshold](#adaptivethreshold)
-   - [Blue](#blue)
-   - [Carve](#carve)
-   - [Circle](#circle)
-   - [Const](#const)
-   - [Dup](#dup)
-   - [Func](#func)
-   - [Func2](#func2)
-   - [Func3](#func3)
-   - [Gaussian](#gaussian)
-   - [Gray](#gray)
-   - [Green](#green)
-   - [Grid](#grid)
-   - [HFlip](#hflip)
-   - [Id](#id)
-   - [Median](#median)
-   - [OtsuThreshold](#otsuthreshold)
-   - [Red](#red)
-   - [Resize](#resize)
-   - [Rot](#rot)
-   - [Rotate](#rotate)
-   - [Scale](#scale)
-   - [Sobel](#sobel)
-   - [Threshold](#threshold)
-   - [Translate](#translate)
-   - [VFlip](#vflip)
 
 ## Installation
 
@@ -51,6 +22,10 @@ cargo install imagecli
 ```
 
 There are currently no pre-built binaries available.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Basic usage
 

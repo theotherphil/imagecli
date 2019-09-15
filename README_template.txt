@@ -17,6 +17,10 @@ cargo install imagecli
 
 There are currently no pre-built binaries available.
 
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## Basic usage
 
 The simplest possible usage loads an image and then saves an identical copy of it.

@@ -1,9 +1,12 @@
 //! Defines the `ImageOp` trait, and all operations supported by this library.
 
-use crate::example::Example;
-use crate::expr::Expr;
-use crate::parse_utils::{int, named_arg, nonempty_sequence, op_one, op_one_opt, op_two, op_zero};
-use crate::ImageStack;
+use crate::{
+    error::{ImageCliError, Result},
+    example::Example,
+    expr::Expr,
+    parse_utils::{int, named_arg, nonempty_sequence, op_one, op_one_opt, op_two, op_zero},
+    ImageStack,
+};
 use image::{
     Bgr, Bgra, DynamicImage, DynamicImage::*, GenericImage, GenericImageView, Luma, LumaA, Rgb,
     Rgba, RgbaImage,
@@ -27,34 +30,22 @@ pub trait ImageOp: std::fmt::Debug {
     fn apply(&self, stack: &mut ImageStack) -> usize;
 }
 
-/// Parse a pipeline, panicking with a moderately useful message
-/// if parsing fails.
-pub fn parse(pipeline: &str) -> Vec<Box<dyn ImageOp>> {
+/// Parse a pipeline, returning a moderately useful error if parsing fails.
+pub fn parse(pipeline: &str) -> Result<Vec<Box<dyn ImageOp>>> {
     if pipeline.trim().is_empty() {
-        return Vec::new();
+        return Ok(Vec::new());
     }
-    let parsed = parse_pipeline(pipeline);
-    match parsed {
-        Ok(p) => p.1,
-        Err(e) => {
-            let remaining = match e {
-                nom::Err::Error(e) => e.0,
-                _ => unreachable!(),
-            };
-            let consumed = &pipeline[0..pipeline.len() - remaining.len()];
-            panic!(
-                "
-Unable to parse pipeline.
-
-Consumed: '{}'
-Remaining: '{}'
-
-The error is likely near the start of the remaining (unparsed) text.
-",
-                consumed, remaining
-            )
+    parse_pipeline(pipeline).map(|p| p.1).map_err(|e| {
+        let remaining = match e {
+            nom::Err::Error(e) => e.0,
+            _ => unreachable!(),
+        };
+        let consumed = &pipeline[0..pipeline.len() - remaining.len()];
+        ImageCliError::PipelineParseError {
+            consumed: consumed.into(),
+            remaining: remaining.into(),
         }
-    }
+    })
 }
 
 fn parse_pipeline(input: &str) -> IResult<&str, Vec<Box<dyn ImageOp>>> {

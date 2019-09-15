@@ -1,7 +1,11 @@
 //! Types representing example pipelines to run, and functions to run them.
 
-use crate::run_pipeline;
+use crate::{
+    error::{ImageSaveError, IoError, Result},
+    run_pipeline,
+};
 use image::open;
+use snafu::ResultExt;
 use std::fmt::Write;
 use std::path::Path;
 
@@ -105,7 +109,7 @@ impl InstantiatedExample {
     }
 
     /// Run this example and write output files.
-    pub fn run(&self) {
+    pub fn run(&self) -> Result<()> {
         let input_paths = self
             .input_file_names
             .iter()
@@ -119,15 +123,19 @@ impl InstantiatedExample {
             .map(|f| Path::new(&self.output_dir).join(f))
             .collect();
 
-        let outputs = run_pipeline(&self.pipeline, inputs, false);
+        let outputs = run_pipeline(&self.pipeline, inputs, false)?;
 
         if !Path::new(&self.output_dir).is_dir() {
-            std::fs::create_dir(&self.output_dir).unwrap();
+            std::fs::create_dir(&self.output_dir).context(IoError {
+                context: format!("Unable to create directory '{}", &self.output_dir),
+            })?;
         }
 
         for (path, image) in output_paths.iter().zip(outputs) {
-            image.save(path).unwrap();
+            image.save(path).context(ImageSaveError { path })?;
         }
+
+        Ok(())
     }
 
     fn command_line_for_documentation(&self) -> String {

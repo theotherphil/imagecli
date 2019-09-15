@@ -14,11 +14,12 @@
 )]
 
 use image::{open, DynamicImage, GenericImageView};
+use snafu::ResultExt;
 use std::path::PathBuf;
 
 pub mod documentation;
 pub mod error;
-use crate::error::Result;
+use crate::error::{ImageOpenError, ImageSaveError, Result};
 mod example;
 mod expr;
 pub mod image_ops;
@@ -45,7 +46,7 @@ pub fn process(
     // Load inputs
     let mut inputs = Vec::new();
     for path in input_paths.iter() {
-        let image = open(path)?;
+        let image = open(path).context(ImageOpenError { path })?;
         if verbose {
             println!(
                 "Loaded input {:?} (width: {}, height: {})",
@@ -62,7 +63,7 @@ pub fn process(
         Some(p) => p.clone(),
         None => "".into(),
     };
-    let outputs = run_pipeline(&pipeline, inputs, verbose);
+    let outputs = run_pipeline(&pipeline, inputs, verbose)?;
 
     // Save results
     for (path, image) in output_paths.iter().zip(outputs) {
@@ -74,16 +75,20 @@ pub fn process(
                 image.height()
             );
         }
-        image.save(path)?;
+        image.save(path).context(ImageSaveError { path })?;
     }
 
     Ok(())
 }
 
 /// Run an image processing pipeline on a stack with the given initial contents.
-pub fn run_pipeline(pipeline: &str, inputs: Vec<DynamicImage>, verbose: bool) -> Vec<DynamicImage> {
+pub fn run_pipeline(
+    pipeline: &str,
+    inputs: Vec<DynamicImage>,
+    verbose: bool,
+) -> Result<Vec<DynamicImage>> {
     let mut stack = ImageStack::new(inputs);
-    let ops = parse(pipeline);
+    let ops = parse(pipeline)?;
 
     for op in ops {
         if verbose {
@@ -92,5 +97,5 @@ pub fn run_pipeline(pipeline: &str, inputs: Vec<DynamicImage>, verbose: bool) ->
         op.apply(&mut stack);
     }
 
-    stack.contents()
+    Ok(stack.contents())
 }

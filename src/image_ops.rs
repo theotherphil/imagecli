@@ -4,7 +4,9 @@ use crate::{
     error::{ImageCliError, Result},
     example::Example,
     expr::Expr,
-    parse_utils::{int, named_arg, nonempty_sequence, op_one, op_one_opt, op_two, op_zero},
+    parse_utils::{
+        int, named_arg, nonempty_sequence, op_four, op_one, op_one_opt, op_two, op_zero,
+    },
     ImageStack,
 };
 use image::{
@@ -68,6 +70,7 @@ fn parse_image_op(input: &str) -> IResult<&str, Box<dyn ImageOp>> {
             Carve::parse,
             Circle::parse,
             Const::parse,
+            Crop::parse,
             Dup::parse,
             Func::parse,
             Func2::parse,
@@ -82,9 +85,9 @@ fn parse_image_op(input: &str) -> IResult<&str, Box<dyn ImageOp>> {
             Median::parse,
             OtsuThreshold::parse,
             Red::parse,
-            Resize::parse,
         )),
         alt((
+            Resize::parse,
             Rot::parse,
             Rotate::parse,
             Scale::parse,
@@ -107,6 +110,7 @@ pub fn documentation() -> Vec<Documentation> {
         Carve::documentation(),
         Circle::documentation(),
         Const::documentation(),
+        Crop::documentation(),
         Dup::documentation(),
         Func::documentation(),
         Func2::documentation(),
@@ -492,6 +496,49 @@ or RGBA: `(128, 128, 0, 255)`. Note that this consumes an image from the stack."
     ),
     examples:
         Example::new(1, 1, "const 300 250 (255, 255, 0)")
+);
+
+//-----------------------------------------------------------------------------
+// Crop
+//-----------------------------------------------------------------------------
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+struct Crop {
+    left: u32,
+    top: u32,
+    width: u32,
+    height: u32,
+}
+
+impl ImageOp for Crop {
+    fn apply(&self, stack: &mut ImageStack) -> usize {
+        let mut image = stack.pop();
+        let cropped = dynamic_map!(&mut image, |i| crop(i, self));
+        stack.push(cropped);
+        1
+    }
+}
+
+fn crop<I: GenericImage>(
+    image: &mut I,
+    crop: &Crop,
+) -> ImageBuffer<I::Pixel, Vec<<I::Pixel as Pixel>::Subpixel>>
+where
+    I: 'static,
+{
+    image::imageops::crop(image, crop.left, crop.top, crop.width, crop.height).to_image()
+}
+
+impl_parse!(
+    Crop,
+    "crop <left> <top> <width> <height>",
+    "Extracts a rectangular region from an image.
+
+Returns a copy of the image region with inclusive top left point `(left, top)`
+and dimensions `(width, height)`.",
+    op_four("crop", int::<u32>, int::<u32>, int::<u32>, int::<u32>, |left, top, width, height| Crop { left, top, width, height }),
+    examples:
+        Example::new(1, 1, "crop 10 50 100 150")
 );
 
 //-----------------------------------------------------------------------------

@@ -101,3 +101,35 @@ where
         )(i)
     }
 }
+
+/// Parser for an operator which takes four args.
+pub fn op_four<T, F1, F2, F3, F4, A1, A2, A3, A4, G>(
+    name: &'static str,
+    arg1: F1,
+    arg2: F2,
+    arg3: F3,
+    arg4: F4,
+    build: G,
+) -> impl Fn(&str) -> IResult<&str, T>
+where
+    F1: Fn(&str) -> IResult<&str, A1> + Copy,
+    F2: Fn(&str) -> IResult<&str, A2> + Copy,
+    F3: Fn(&str) -> IResult<&str, A3> + Copy,
+    F4: Fn(&str) -> IResult<&str, A4> + Copy,
+    G: Fn(A1, A2, A3, A4) -> T + Copy,
+{
+    move |i| {
+        map(
+            preceded(
+                tag(name),
+                tuple((
+                    preceded(space1, arg1),
+                    preceded(space1, arg2),
+                    preceded(space1, arg3),
+                    preceded(space1, arg4),
+                )),
+            ),
+            |(val1, val2, val3, val4)| build(val1, val2, val3, val4),
+        )(i)
+    }
+}

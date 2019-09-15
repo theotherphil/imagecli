@@ -1,7 +1,7 @@
 //! Defines the `ImageOp` trait, and all operations supported by this library.
 
-use crate::expr::Expr;
 use crate::example::Example;
+use crate::expr::Expr;
 use crate::parse_utils::{int, named_arg, nonempty_sequence, op_one, op_one_opt, op_two, op_zero};
 use crate::ImageStack;
 use image::{

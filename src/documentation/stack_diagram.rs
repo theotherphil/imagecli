@@ -8,7 +8,7 @@ use std::fmt::Write;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StackDiagram {
     /// The stages to render, in order.
-    pub stages: Vec<StackDiagramStage>
+    pub stages: Vec<StackDiagramStage>,
 }
 
 /// A stage in a stack diagram.
@@ -66,7 +66,7 @@ mod tests {
                 StackDiagramStage::Transition("some operation".into()),
                 StackDiagramStage::Stack(vec!["C".into(), "B".into()]),
                 StackDiagramStage::Transition("save results".into()),
-            ]
+            ],
         };
         let expected = "```
     |

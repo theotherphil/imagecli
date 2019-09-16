@@ -2,12 +2,12 @@
 
 use std::fmt::Write;
 
-/// A link within a markdown document
+/// A link within a markdown document.
 pub fn markdown_internal_link(section: &str) -> String {
     format!("[{}](#{})", section, markdown_anchor_name(section))
 }
 
-/// Name of the anchor github generate for a markdown section.
+/// Name of the anchor github generates for a markdown section.
 fn markdown_anchor_name(section: &str) -> String {
     section
         .trim()

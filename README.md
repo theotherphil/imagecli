@@ -396,6 +396,7 @@ Operation|Usage|Description
 [Id](#id)|`id`|Applies the identity function, i.e. does nothing.
 [Median](#median)|`median <x_radius> <y_radius>`|Applies a median filter to an image.
 [OtsuThreshold](#otsuthreshold)|`othresh`|Binarises an image using Otsu thresholding.
+[Overlay](#overlay)|`overlay <left> <top>`|Overlays the second image on the stack onto the first.
 [Red](#red)|`red`|Extracts the red channel from an image as a grayscale image.
 [Resize](#resize)|`resize (<width> <height>\|w=<width>\|h=<height>\|w=<width> h=<height>)`|Resizes an image to the given dimensions.
 [Rot](#rot)|`ROT [count]`|Rotates the top `count` elements of the stack by 1.
@@ -633,6 +634,20 @@ Binarises an image using Otsu thresholding.
 
 <pre>imagecli -i robin.png -o OtsuThreshold_0_0.png -p 'othresh'</pre>
 <img src='images/operations/OtsuThreshold_0_0.png'/>
+
+### Overlay
+
+Usage: `overlay <left> <top>`
+
+Overlays the second image on the stack onto the first.
+
+Places the second image with its top left corner at `(left, top )` on the first image,
+cropping if it does not fit.
+
+#### Examples
+
+<pre>imagecli -i robin.png -o Overlay_0_0.png -p 'DUP > const 184 268 (255, 255, 0) > overlay 10 50'</pre>
+<img src='images/operations/Overlay_0_0.png'/>
 
 ### Red
 

@@ -84,9 +84,10 @@ fn parse_image_op(input: &str) -> IResult<&str, Box<dyn ImageOp>> {
             Id::parse,
             Median::parse,
             OtsuThreshold::parse,
-            Red::parse,
+            Overlay::parse,
         )),
         alt((
+            Red::parse,
             Resize::parse,
             Rot::parse,
             Rotate::parse,
@@ -123,6 +124,7 @@ pub fn documentation() -> Vec<Documentation> {
         Id::documentation(),
         Median::documentation(),
         OtsuThreshold::documentation(),
+        Overlay::documentation(),
         Red::documentation(),
         Resize::documentation(),
         Rot::documentation(),
@@ -211,6 +213,27 @@ pub fn color_space(image: &DynamicImage) -> ColorSpace {
         DynamicImage::ImageRgba8(_) => ColorSpace::Rgba8,
         DynamicImage::ImageBgr8(_) => ColorSpace::Bgr8,
         DynamicImage::ImageBgra8(_) => ColorSpace::Bgra8,
+    }
+}
+
+/// Consumes an image, and converts it to the desired color space.
+/// If the image is already in the correct format then it is just returned.
+pub fn convert_to_color_space(
+    image: DynamicImage,
+    space: ColorSpace
+) -> DynamicImage {
+    if color_space(&image) == space {
+        return image;
+    }
+    use DynamicImage::*;
+    use ColorSpace::*;
+    match space {
+        Luma8 => ImageLuma8(image.to_luma()),
+        LumaA8 => ImageLumaA8(image.to_luma_alpha()),
+        Rgb8 => ImageRgb8(image.to_rgb()),
+        Rgba8 => ImageRgba8(image.to_rgba()),
+        Bgr8 => ImageBgr8(image.to_bgr()),
+        Bgra8 => ImageBgra8(image.to_bgra()),
     }
 }
 
@@ -770,15 +793,8 @@ struct Gray;
 impl ImageOp for Gray {
     fn apply(&self, stack: &mut ImageStack) -> usize {
         let image = stack.pop();
-        stack.push(gray(image));
+        stack.push(convert_to_color_space(image, ColorSpace::Luma8));
         1
-    }
-}
-
-fn gray(image: DynamicImage) -> DynamicImage {
-    match image {
-        ImageLuma8(i) => ImageLuma8(i),
-        _ => image.grayscale(),
     }
 }
 
@@ -991,7 +1007,7 @@ impl ImageOp for OtsuThreshold {
 
 fn otsu_threshold(image: DynamicImage) -> DynamicImage {
     use imageproc::contrast::{otsu_level, threshold_mut};
-    let mut image = match gray(image) {
+    let mut image = match convert_to_color_space(image, ColorSpace::Luma8) {
         ImageLuma8(i) => i,
         _ => unreachable!(),
     };
@@ -1007,6 +1023,65 @@ impl_parse!(
     op_zero("othresh", OtsuThreshold),
     examples:
         Example::new(1, 1, "othresh")
+);
+
+//-----------------------------------------------------------------------------
+// Overlay
+//-----------------------------------------------------------------------------
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+struct Overlay(u32, u32);
+
+impl ImageOp for Overlay {
+    fn apply(&self, stack: &mut ImageStack) -> usize {
+        let under = stack.pop();
+        let over = stack.pop();
+
+        // TODO: avoid unnecesssarily converting the top image if it's already
+        // TODO: of the correct type.
+        use DynamicImage::*;
+        let result = match under {
+            ImageLuma8(mut image) => {
+                image::imageops::overlay(&mut image, &over.to_luma(), self.0, self.1);
+                ImageLuma8(image)
+            },
+            ImageLumaA8(mut image) => {
+                image::imageops::overlay(&mut image, &over.to_luma_alpha(), self.0, self.1);
+                ImageLumaA8(image)
+            },
+            ImageRgb8(mut image) => {
+                image::imageops::overlay(&mut image, &over.to_rgb(), self.0, self.1);
+                ImageRgb8(image)
+            },
+            ImageRgba8(mut image) => {
+                image::imageops::overlay(&mut image, &over.to_rgba(), self.0, self.1);
+                ImageRgba8(image)
+            },
+            ImageBgr8(mut image) => {
+                image::imageops::overlay(&mut image, &over.to_bgr(), self.0, self.1);
+                ImageBgr8(image)
+            },
+            ImageBgra8(mut image) => {
+                image::imageops::overlay(&mut image, &over.to_bgra(), self.0, self.1);
+                ImageBgra8(image)
+            },
+        };
+
+        stack.push(result);
+        1
+    }
+}
+
+impl_parse!(
+    Overlay,
+    "overlay <left> <top>",
+    "Overlays the second image on the stack onto the first.
+
+Places the second image with its top left corner at `(left, top )` on the first image,
+cropping if it does not fit.",
+    op_two("overlay", int::<u32>, int::<u32>, Overlay),
+    examples:
+        Example::new(1, 1, "DUP > const 184 268 (255, 255, 0) > overlay 10 50")
 );
 
 //-----------------------------------------------------------------------------
@@ -1295,7 +1370,7 @@ impl ImageOp for Threshold {
 
 fn threshold(image: DynamicImage, level: u8) -> DynamicImage {
     use imageproc::contrast::threshold_mut;
-    let mut image = match gray(image) {
+    let mut image = match convert_to_color_space(image, ColorSpace::Luma8) {
         ImageLuma8(i) => i,
         _ => unreachable!(),
     };

@@ -218,15 +218,12 @@ pub fn color_space(image: &DynamicImage) -> ColorSpace {
 
 /// Consumes an image, and converts it to the desired color space.
 /// If the image is already in the correct format then it is just returned.
-pub fn convert_to_color_space(
-    image: DynamicImage,
-    space: ColorSpace
-) -> DynamicImage {
+pub fn convert_to_color_space(image: DynamicImage, space: ColorSpace) -> DynamicImage {
     if color_space(&image) == space {
         return image;
     }
-    use DynamicImage::*;
     use ColorSpace::*;
+    use DynamicImage::*;
     match space {
         Luma8 => ImageLuma8(image.to_luma()),
         LumaA8 => ImageLumaA8(image.to_luma_alpha()),
@@ -1042,27 +1039,27 @@ impl ImageOp for Overlay {
             (ImageLuma8(mut under), ImageLuma8(over)) => {
                 image::imageops::overlay(&mut under, &over, self.0, self.1);
                 ImageLuma8(under)
-            },
+            }
             (ImageLumaA8(mut under), ImageLumaA8(over)) => {
                 image::imageops::overlay(&mut under, &over, self.0, self.1);
                 ImageLumaA8(under)
-            },
+            }
             (ImageRgb8(mut under), ImageRgb8(over)) => {
                 image::imageops::overlay(&mut under, &over, self.0, self.1);
                 ImageRgb8(under)
-            },
+            }
             (ImageRgba8(mut under), ImageRgba8(over)) => {
                 image::imageops::overlay(&mut under, &over, self.0, self.1);
                 ImageRgba8(under)
-            },
+            }
             (ImageBgr8(mut under), ImageBgr8(over)) => {
                 image::imageops::overlay(&mut under, &over, self.0, self.1);
                 ImageBgr8(under)
-            },
+            }
             (ImageBgra8(mut under), ImageBgra8(over)) => {
                 image::imageops::overlay(&mut under, &over, self.0, self.1);
                 ImageBgra8(under)
-            },
+            }
             // Due to the call to convert_to_color_space above
             _ => unreachable!(),
         };

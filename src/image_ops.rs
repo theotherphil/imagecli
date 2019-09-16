@@ -1035,36 +1035,36 @@ struct Overlay(u32, u32);
 impl ImageOp for Overlay {
     fn apply(&self, stack: &mut ImageStack) -> usize {
         let under = stack.pop();
-        let over = stack.pop();
+        let over = convert_to_color_space(stack.pop(), color_space(&under));
 
-        // TODO: avoid unnecesssarily converting the top image if it's already
-        // TODO: of the correct type.
         use DynamicImage::*;
-        let result = match under {
-            ImageLuma8(mut image) => {
-                image::imageops::overlay(&mut image, &over.to_luma(), self.0, self.1);
-                ImageLuma8(image)
+        let result = match (under, over) {
+            (ImageLuma8(mut under), ImageLuma8(over)) => {
+                image::imageops::overlay(&mut under, &over, self.0, self.1);
+                ImageLuma8(under)
             },
-            ImageLumaA8(mut image) => {
-                image::imageops::overlay(&mut image, &over.to_luma_alpha(), self.0, self.1);
-                ImageLumaA8(image)
+            (ImageLumaA8(mut under), ImageLumaA8(over)) => {
+                image::imageops::overlay(&mut under, &over, self.0, self.1);
+                ImageLumaA8(under)
             },
-            ImageRgb8(mut image) => {
-                image::imageops::overlay(&mut image, &over.to_rgb(), self.0, self.1);
-                ImageRgb8(image)
+            (ImageRgb8(mut under), ImageRgb8(over)) => {
+                image::imageops::overlay(&mut under, &over, self.0, self.1);
+                ImageRgb8(under)
             },
-            ImageRgba8(mut image) => {
-                image::imageops::overlay(&mut image, &over.to_rgba(), self.0, self.1);
-                ImageRgba8(image)
+            (ImageRgba8(mut under), ImageRgba8(over)) => {
+                image::imageops::overlay(&mut under, &over, self.0, self.1);
+                ImageRgba8(under)
             },
-            ImageBgr8(mut image) => {
-                image::imageops::overlay(&mut image, &over.to_bgr(), self.0, self.1);
-                ImageBgr8(image)
+            (ImageBgr8(mut under), ImageBgr8(over)) => {
+                image::imageops::overlay(&mut under, &over, self.0, self.1);
+                ImageBgr8(under)
             },
-            ImageBgra8(mut image) => {
-                image::imageops::overlay(&mut image, &over.to_bgra(), self.0, self.1);
-                ImageBgra8(image)
+            (ImageBgra8(mut under), ImageBgra8(over)) => {
+                image::imageops::overlay(&mut under, &over, self.0, self.1);
+                ImageBgra8(under)
             },
+            // Due to the call to convert_to_color_space above
+            _ => unreachable!(),
         };
 
         stack.push(result);

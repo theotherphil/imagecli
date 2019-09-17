@@ -1021,7 +1021,6 @@ This makes some pipelines more concise to write.",
     op_zero("id", Id)
 );
 
-
 //-----------------------------------------------------------------------------
 // Map
 //-----------------------------------------------------------------------------
@@ -1040,7 +1039,7 @@ impl ImageOp for Map {
         assert!(
             num_inputs > 0 && num_outputs > 0,
             "map can only be applied to operations which consume at least one input and produce \
-            at least one output"
+             at least one output"
         );
 
         let mut results = Vec::new();

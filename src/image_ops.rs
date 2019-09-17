@@ -89,11 +89,12 @@ fn parse_image_op(input: &str) -> IResult<&str, Box<dyn ImageOp>> {
             map_box!(op_one_opt("hcat", int::<u32>, |x| Grid(x.unwrap_or(2), 1))),
             HFlip::parse,
             Id::parse,
+            Map::parse,
             Median::parse,
             OtsuThreshold::parse,
-            Overlay::parse,
         )),
         alt((
+            Overlay::parse,
             Red::parse,
             Resize::parse,
             Rot::parse,
@@ -129,6 +130,7 @@ pub fn documentation() -> Vec<Documentation> {
         Grid::documentation(),
         HFlip::documentation(),
         Id::documentation(),
+        Map::documentation(),
         Median::documentation(),
         OtsuThreshold::documentation(),
         Overlay::documentation(),
@@ -315,7 +317,7 @@ impl ImageOp for Array {
         for op in &self.0 {
             assert!(
                 op.signature().is_some(),
-                "Operations with arrays must have a fixed number of inputs and outputs"
+                "Operations within arrays must have a fixed number of inputs and outputs"
             );
             op.apply(stack);
             for _ in 0..op.signature().unwrap().1 {
@@ -1019,6 +1021,68 @@ This makes some pipelines more concise to write.",
     op_zero("id", Id)
 );
 
+
+//-----------------------------------------------------------------------------
+// Map
+//-----------------------------------------------------------------------------
+
+#[derive(Debug)]
+struct Map(Box<dyn ImageOp>);
+
+impl ImageOp for Map {
+    fn apply(&self, stack: &mut ImageStack) {
+        let op = &self.0;
+        assert!(
+            op.signature().is_some(),
+            "map can only be applied to operations with a fixed number of inputs and outputs"
+        );
+        let (num_inputs, num_outputs) = op.signature().unwrap();
+        assert!(
+            num_inputs > 0 && num_outputs > 0,
+            "map can only be applied to operations which consume at least one input and at \
+            least one output"
+        );
+
+        let mut results = Vec::new();
+        let count = stack.len() / num_inputs;
+
+        for _ in 0..count {
+            op.apply(stack);
+            for _ in 0..num_outputs {
+                results.push(stack.pop());
+            }
+        }
+
+        for result in results.into_iter().rev() {
+            stack.push(result);
+        }
+    }
+
+    fn signature(&self) -> Option<(usize, usize)> {
+        None
+    }
+}
+
+impl_parse!(
+    Map,
+    "map (IMAGE_OP)",
+    "Maps a single operation over the stack.
+
+Equivalent to `[IMAGE_OP, ..]` with length equal to `stack size / number of inputs to IMAGE_OP.`",
+    map(
+        preceded(
+            tag("map"),
+            preceded(space1,
+                delimited(tag("("), parse_image_op, tag(")"))
+            )
+        ),
+        Map
+    ),
+    examples:
+        Example::new(1, 1, "DUP 3 > [id, red, green, blue] > map (gaussian 2.0) > hcat 4"),
+        Example::new(1, 1, "DUP 5 > [id, rotate 10, rotate 20, rotate 30, rotate 40, rotate 50] > map (hcat 3) > vcat")
+);
+
 //-----------------------------------------------------------------------------
 // Median
 //-----------------------------------------------------------------------------
@@ -1719,11 +1783,6 @@ mod tests {
     fn test_parse_invalid_multi_stage_pipeline() {
         // The grid stage is invalid
         assert_pipeline_parse_failure("gray > grid 1 > scale 3 > id");
-    }
-
-    #[test]
-    fn test_parse_array_rejects_nested_maps() {
-        // TODO
     }
 
     #[test]

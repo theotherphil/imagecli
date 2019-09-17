@@ -394,6 +394,7 @@ Operation|Usage|Description
 [Grid](#grid)|`grid <columns> <rows>`|Arranges a series of images into a grid.
 [HFlip](#hflip)|`hflip`|Flips an image horizontally.
 [Id](#id)|`id`|Applies the identity function, i.e. does nothing.
+[Map](#map)|`map (IMAGE_OP)`|Maps a single operation over the stack.
 [Median](#median)|`median <x_radius> <y_radius>`|Applies a median filter to an image.
 [OtsuThreshold](#otsuthreshold)|`othresh`|Binarises an image using Otsu thresholding.
 [Overlay](#overlay)|`overlay <left> <top>`|Overlays the second image on the stack onto the first.
@@ -610,6 +611,21 @@ Usage: `id`
 Applies the identity function, i.e. does nothing.
 
 This makes some pipelines more concise to write.
+
+### Map
+
+Usage: `map (IMAGE_OP)`
+
+Maps a single operation over the stack.
+
+Equivalent to `[IMAGE_OP, ..]` with length equal to `stack size / number of inputs to IMAGE_OP.`
+
+#### Examples
+
+<pre>imagecli -i robin.png -o Map_0_0.png -p 'DUP 3 > [id, red, green, blue] > map (gaussian 2.0) > hcat 4'</pre>
+<img src='images/operations/Map_0_0.png'/>
+<pre>imagecli -i robin.png -o Map_1_0.png -p 'DUP 5 > [id, rotate 10, rotate 20, rotate 30, rotate 40, rotate 50] > map (hcat 3) > vcat'</pre>
+<img src='images/operations/Map_1_0.png'/>
 
 ### Median
 

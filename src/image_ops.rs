@@ -28,8 +28,15 @@ use std::cmp;
 /// An image processing operation that operates on a stack of images.
 pub trait ImageOp: std::fmt::Debug {
     /// Apply this operation to the top of the stack.
-    /// Returns the number of results produced by this operation.
-    fn apply(&self, stack: &mut ImageStack) -> usize;
+    fn apply(&self, stack: &mut ImageStack);
+
+    /// Returns the number of stack images consumed by this operation
+    /// and the number of results produced, if this is known without
+    /// reference to the stack size.
+    ///
+    /// Operations for which `signature` returns `None` cannot be used
+    /// inside an `Array` or `Map`.
+    fn signature(&self) -> Option<(usize, usize)>;
 }
 
 /// Parse a pipeline, returning a moderately useful error if parsing fails.
@@ -271,12 +278,15 @@ fn color_from_vals(vals: &[u8]) -> Color {
 struct AdaptiveThreshold(u32);
 
 impl ImageOp for AdaptiveThreshold {
-    fn apply(&self, stack: &mut ImageStack) -> usize {
+    fn apply(&self, stack: &mut ImageStack) {
         let gray = stack.pop().to_luma();
         stack.push(ImageLuma8(imageproc::contrast::adaptive_threshold(
             &gray, self.0,
         )));
-        1
+    }
+
+    fn signature(&self) -> Option<(usize, usize)> {
+        Some((1, 1))
     }
 }
 
@@ -296,24 +306,29 @@ block around it with side length `2 * block_radius + 1`.",
 // Array
 //-----------------------------------------------------------------------------
 
-// TODO: either add tests for nested arrays or reject them when parsing
 #[derive(Debug)]
 struct Array(Vec<Box<dyn ImageOp>>);
 
 impl ImageOp for Array {
-    fn apply(&self, stack: &mut ImageStack) -> usize {
+    fn apply(&self, stack: &mut ImageStack) {
         let mut results = Vec::new();
         for op in &self.0 {
-            let count = op.apply(stack);
-            for _ in 0..count {
+            assert!(
+                op.signature().is_some(),
+                "Operations with arrays must have a fixed number of inputs and outputs"
+            );
+            op.apply(stack);
+            for _ in 0..op.signature().unwrap().1 {
                 results.push(stack.pop());
             }
         }
-        let num_results = results.len();
         for result in results.into_iter().rev() {
             stack.push(result);
         }
-        num_results
+    }
+
+    fn signature(&self) -> Option<(usize, usize)> {
+        None
     }
 }
 
@@ -343,10 +358,13 @@ all of its results. We then push all the results to the stack.",
 struct Blue;
 
 impl ImageOp for Blue {
-    fn apply(&self, stack: &mut ImageStack) -> usize {
+    fn apply(&self, stack: &mut ImageStack) {
         let rgb = stack.pop().to_rgb();
         stack.push(ImageLuma8(imageproc::map::blue_channel(&rgb)));
-        1
+    }
+
+    fn signature(&self) -> Option<(usize, usize)> {
+        Some((1, 1))
     }
 }
 
@@ -367,13 +385,16 @@ impl_parse!(
 struct Carve(f32);
 
 impl ImageOp for Carve {
-    fn apply(&self, stack: &mut ImageStack) -> usize {
+    fn apply(&self, stack: &mut ImageStack) {
         use imageproc::seam_carving::shrink_width;
         assert!(self.0 <= 1.0);
         let image = stack.pop();
         let target_width = (image.width() as f32 * self.0) as u32;
         stack.push(dynamic_map!(&image, |i| shrink_width(i, target_width)));
-        1
+    }
+
+    fn signature(&self) -> Option<(usize, usize)> {
+        Some((1, 1))
     }
 }
 
@@ -418,10 +439,13 @@ impl From<&str> for FillType {
 }
 
 impl ImageOp for Circle {
-    fn apply(&self, stack: &mut ImageStack) -> usize {
+    fn apply(&self, stack: &mut ImageStack) {
         let image = stack.pop();
         stack.push(draw_circle(image, self));
-        1
+    }
+
+    fn signature(&self) -> Option<(usize, usize)> {
+        Some((1, 1))
     }
 }
 
@@ -483,7 +507,7 @@ struct Const {
 }
 
 impl ImageOp for Const {
-    fn apply(&self, stack: &mut ImageStack) -> usize {
+    fn apply(&self, stack: &mut ImageStack) {
         stack.pop();
         let constant = match self.color {
             Color::Luma(l) => ImageLuma8(ImageBuffer::from_pixel(self.width, self.height, l)),
@@ -492,7 +516,10 @@ impl ImageOp for Const {
             Color::Rgba(l) => ImageRgba8(ImageBuffer::from_pixel(self.width, self.height, l)),
         };
         stack.push(constant);
-        1
+    }
+
+    fn signature(&self) -> Option<(usize, usize)> {
+        Some((1, 1))
     }
 }
 
@@ -531,11 +558,14 @@ struct Crop {
 }
 
 impl ImageOp for Crop {
-    fn apply(&self, stack: &mut ImageStack) -> usize {
+    fn apply(&self, stack: &mut ImageStack) {
         let mut image = stack.pop();
         let cropped = dynamic_map!(&mut image, |i| crop(i, self));
         stack.push(cropped);
-        1
+    }
+
+    fn signature(&self) -> Option<(usize, usize)> {
+        Some((1, 1))
     }
 }
 
@@ -569,9 +599,12 @@ and dimensions `(width, height)`.",
 struct Dup(usize);
 
 impl ImageOp for Dup {
-    fn apply(&self, stack: &mut ImageStack) -> usize {
+    fn apply(&self, stack: &mut ImageStack) {
         stack.dup(self.0);
-        self.0 + 1
+    }
+
+    fn signature(&self) -> Option<(usize, usize)> {
+        Some((1, self.0 + 1))
     }
 }
 
@@ -600,14 +633,17 @@ impl std::fmt::Debug for Func {
 }
 
 impl ImageOp for Func {
-    fn apply(&self, stack: &mut ImageStack) -> usize {
+    fn apply(&self, stack: &mut ImageStack) {
         let image = stack.pop();
         let f = |p, x, y| {
             let r = self.expr.evaluate(x as f32, y as f32, p as f32, 0.0, 0.0);
             <u8 as Clamp<f32>>::clamp(r)
         };
         stack.push(dynamic_map!(&image, |i| map_subpixels_with_coords(i, f)));
-        1
+    }
+
+    fn signature(&self) -> Option<(usize, usize)> {
+        Some((1, 1))
     }
 }
 
@@ -647,12 +683,15 @@ impl std::fmt::Debug for Func2 {
 }
 
 impl ImageOp for Func2 {
-    fn apply(&self, stack: &mut ImageStack) -> usize {
+    fn apply(&self, stack: &mut ImageStack) {
         let image1 = stack.pop();
         let image2 = stack.pop();
         let result = func2(&image1, &image2, &self.expr);
         stack.push(result);
-        1
+    }
+
+    fn signature(&self) -> Option<(usize, usize)> {
+        Some((2, 1))
     }
 }
 
@@ -711,13 +750,16 @@ impl std::fmt::Debug for Func3 {
 }
 
 impl ImageOp for Func3 {
-    fn apply(&self, stack: &mut ImageStack) -> usize {
+    fn apply(&self, stack: &mut ImageStack) {
         let image1 = stack.pop();
         let image2 = stack.pop();
         let image3 = stack.pop();
         let result = func3(&image1, &image2, &image3, &self.expr);
         stack.push(result);
-        1
+    }
+
+    fn signature(&self) -> Option<(usize, usize)> {
+        Some((3, 1))
     }
 }
 
@@ -763,11 +805,14 @@ more information.",
 struct Gaussian(f32);
 
 impl ImageOp for Gaussian {
-    fn apply(&self, stack: &mut ImageStack) -> usize {
+    fn apply(&self, stack: &mut ImageStack) {
         use imageproc::filter::gaussian_blur_f32;
         let image = stack.pop();
         stack.push(dynamic_map!(&image, |i| gaussian_blur_f32(i, self.0)));
-        1
+    }
+
+    fn signature(&self) -> Option<(usize, usize)> {
+        Some((1, 1))
     }
 }
 
@@ -788,10 +833,13 @@ impl_parse!(
 struct Gray;
 
 impl ImageOp for Gray {
-    fn apply(&self, stack: &mut ImageStack) -> usize {
+    fn apply(&self, stack: &mut ImageStack) {
         let image = stack.pop();
         stack.push(convert_to_color_space(image, ColorSpace::Luma8));
-        1
+    }
+
+    fn signature(&self) -> Option<(usize, usize)> {
+        Some((1, 1))
     }
 }
 
@@ -812,10 +860,13 @@ impl_parse!(
 struct Green;
 
 impl ImageOp for Green {
-    fn apply(&self, stack: &mut ImageStack) -> usize {
+    fn apply(&self, stack: &mut ImageStack) {
         let rgb = stack.pop().to_rgb();
         stack.push(ImageLuma8(imageproc::map::green_channel(&rgb)));
-        1
+    }
+
+    fn signature(&self) -> Option<(usize, usize)> {
+        Some((1, 1))
     }
 }
 
@@ -836,11 +887,14 @@ impl_parse!(
 struct Grid(u32, u32);
 
 impl ImageOp for Grid {
-    fn apply(&self, stack: &mut ImageStack) -> usize {
+    fn apply(&self, stack: &mut ImageStack) {
         let images = stack.pop_n(self.0 as usize * self.1 as usize);
         let result = grid(&images, self.0, self.1);
         stack.push(result);
-        1
+    }
+
+    fn signature(&self) -> Option<(usize, usize)> {
+        Some((self.0 as usize * self.1 as usize, 1))
     }
 }
 
@@ -920,10 +974,13 @@ to `Grid 1 n`.",
 struct HFlip;
 
 impl ImageOp for HFlip {
-    fn apply(&self, stack: &mut ImageStack) -> usize {
+    fn apply(&self, stack: &mut ImageStack) {
         let image = stack.pop();
         stack.push(dynamic_map!(&image, image::imageops::flip_horizontal));
-        1
+    }
+
+    fn signature(&self) -> Option<(usize, usize)> {
+        Some((1, 1))
     }
 }
 
@@ -944,9 +1001,12 @@ impl_parse!(
 struct Id;
 
 impl ImageOp for Id {
-    fn apply(&self, _: &mut ImageStack) -> usize {
+    fn apply(&self, _stack: &mut ImageStack) {
         // Do nothing
-        1
+    }
+
+    fn signature(&self) -> Option<(usize, usize)> {
+        Some((1, 1))
     }
 }
 
@@ -967,12 +1027,15 @@ This makes some pipelines more concise to write.",
 struct Median(u32, u32);
 
 impl ImageOp for Median {
-    fn apply(&self, stack: &mut ImageStack) -> usize {
+    fn apply(&self, stack: &mut ImageStack) {
         let image = stack.pop();
         stack.push(dynamic_map!(&image, |i| imageproc::filter::median_filter(
             i, self.0, self.1
         )));
-        1
+    }
+
+    fn signature(&self) -> Option<(usize, usize)> {
+        Some((1, 1))
     }
 }
 
@@ -995,10 +1058,13 @@ The filter applied has width `2 * x_radius + 1` and height `2 * y_radius + 1`.",
 struct OtsuThreshold;
 
 impl ImageOp for OtsuThreshold {
-    fn apply(&self, stack: &mut ImageStack) -> usize {
+    fn apply(&self, stack: &mut ImageStack) {
         let image = stack.pop();
         stack.push(otsu_threshold(image));
-        1
+    }
+
+    fn signature(&self) -> Option<(usize, usize)> {
+        Some((1, 1))
     }
 }
 
@@ -1030,7 +1096,7 @@ impl_parse!(
 struct Overlay(u32, u32);
 
 impl ImageOp for Overlay {
-    fn apply(&self, stack: &mut ImageStack) -> usize {
+    fn apply(&self, stack: &mut ImageStack) {
         let under = stack.pop();
         let over = convert_to_color_space(stack.pop(), color_space(&under));
 
@@ -1065,7 +1131,10 @@ impl ImageOp for Overlay {
         };
 
         stack.push(result);
-        1
+    }
+
+    fn signature(&self) -> Option<(usize, usize)> {
+        Some((2, 1))
     }
 }
 
@@ -1089,10 +1158,13 @@ cropping if it does not fit.",
 struct Red;
 
 impl ImageOp for Red {
-    fn apply(&self, stack: &mut ImageStack) -> usize {
+    fn apply(&self, stack: &mut ImageStack) {
         let rgb = stack.pop().to_rgb();
         stack.push(ImageLuma8(imageproc::map::red_channel(&rgb)));
-        1
+    }
+
+    fn signature(&self) -> Option<(usize, usize)> {
+        Some((1, 1))
     }
 }
 
@@ -1116,10 +1188,13 @@ struct Resize {
 }
 
 impl ImageOp for Resize {
-    fn apply(&self, stack: &mut ImageStack) -> usize {
+    fn apply(&self, stack: &mut ImageStack) {
         let image = stack.pop();
         stack.push(resize(&image, self));
-        1
+    }
+
+    fn signature(&self) -> Option<(usize, usize)> {
+        Some((1, 1))
     }
 }
 
@@ -1193,9 +1268,12 @@ to preserve the image's aspect ratio.",
 struct Rot(usize);
 
 impl ImageOp for Rot {
-    fn apply(&self, stack: &mut ImageStack) -> usize {
+    fn apply(&self, stack: &mut ImageStack) {
         stack.rot(self.0);
-        0
+    }
+
+    fn signature(&self) -> Option<(usize, usize)> {
+        Some((0, 0))
     }
 }
 
@@ -1216,10 +1294,13 @@ impl_parse!(
 struct Rotate(f32);
 
 impl ImageOp for Rotate {
-    fn apply(&self, stack: &mut ImageStack) -> usize {
+    fn apply(&self, stack: &mut ImageStack) {
         let image = stack.pop();
         stack.push(rotate(&image, self.0));
-        1
+    }
+
+    fn signature(&self) -> Option<(usize, usize)> {
+        Some((1, 1))
     }
 }
 
@@ -1285,14 +1366,17 @@ impl_parse!(
 struct Scale(f32);
 
 impl ImageOp for Scale {
-    fn apply(&self, stack: &mut ImageStack) -> usize {
+    fn apply(&self, stack: &mut ImageStack) {
         let image = stack.pop();
         let (w, h) = (
             (image.width() as f32 * self.0) as u32,
             (image.height() as f32 * self.0) as u32,
         );
         stack.push(image.resize(w, h, image::imageops::FilterType::Lanczos3));
-        1
+    }
+
+    fn signature(&self) -> Option<(usize, usize)> {
+        Some((1, 1))
     }
 }
 
@@ -1313,10 +1397,13 @@ impl_parse!(
 struct Sobel;
 
 impl ImageOp for Sobel {
-    fn apply(&self, stack: &mut ImageStack) -> usize {
+    fn apply(&self, stack: &mut ImageStack) {
         let image = stack.pop();
         stack.push(sobel(&image));
-        1
+    }
+
+    fn signature(&self) -> Option<(usize, usize)> {
+        Some((1, 1))
     }
 }
 
@@ -1358,10 +1445,13 @@ impl_parse!(
 struct Threshold(u8);
 
 impl ImageOp for Threshold {
-    fn apply(&self, stack: &mut ImageStack) -> usize {
+    fn apply(&self, stack: &mut ImageStack) {
         let image = stack.pop();
         stack.push(threshold(image, self.0));
-        1
+    }
+
+    fn signature(&self) -> Option<(usize, usize)> {
+        Some((1, 1))
     }
 }
 
@@ -1394,11 +1484,14 @@ Images are first converted to grayscale. Thresholds should be `>=0` and `< 256`.
 struct Translate(i32, i32);
 
 impl ImageOp for Translate {
-    fn apply(&self, stack: &mut ImageStack) -> usize {
+    fn apply(&self, stack: &mut ImageStack) {
         use imageproc::geometric_transformations::translate;
         let image = stack.pop();
         stack.push(dynamic_map!(&image, |i| translate(i, (self.0, self.1))));
-        1
+    }
+
+    fn signature(&self) -> Option<(usize, usize)> {
+        Some((1, 1))
     }
 }
 
@@ -1422,10 +1515,13 @@ and positive values of `ty` move it downwards.",
 struct VFlip;
 
 impl ImageOp for VFlip {
-    fn apply(&self, stack: &mut ImageStack) -> usize {
+    fn apply(&self, stack: &mut ImageStack) {
         let image = stack.pop();
         stack.push(dynamic_map!(&image, image::imageops::flip_vertical));
-        1
+    }
+
+    fn signature(&self) -> Option<(usize, usize)> {
+        Some((1, 1))
     }
 }
 
@@ -1623,6 +1719,11 @@ mod tests {
     fn test_parse_invalid_multi_stage_pipeline() {
         // The grid stage is invalid
         assert_pipeline_parse_failure("gray > grid 1 > scale 3 > id");
+    }
+
+    #[test]
+    fn test_parse_array_rejects_nested_maps() {
+        // TODO
     }
 
     #[test]

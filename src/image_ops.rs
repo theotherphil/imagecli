@@ -1039,8 +1039,8 @@ impl ImageOp for Map {
         let (num_inputs, num_outputs) = op.signature().unwrap();
         assert!(
             num_inputs > 0 && num_outputs > 0,
-            "map can only be applied to operations which consume at least one input and at \
-            least one output"
+            "map can only be applied to operations which consume at least one input and produce \
+            at least one output"
         );
 
         let mut results = Vec::new();

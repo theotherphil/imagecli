@@ -269,7 +269,7 @@ inputs.
     v
 ```
 
-#### Option 2 - operation arrays
+#### Option 2 - arrays
 
 As manually rotating through the image stack can be a bit verbose, we also support an array syntax
 which applies the *n*th in a series of operations to the *n*th element in the stack. For example,
@@ -277,8 +277,8 @@ the following command line applies a Gaussian blur to the first image, and a blu
 radius to the second.
 
 <pre>imagecli -i robin.png robin_gray.png -o ex0_0.png ex0_1.png -p '[gaussian 2.0, gaussian 6.0]'</pre>
-<img src='images/option-2---operation-arrays/ex0_0.png'/>
-<img src='images/option-2---operation-arrays/ex0_1.png'/>
+<img src='images/option-2---arrays/ex0_0.png'/>
+<img src='images/option-2---arrays/ex0_1.png'/>
 
 The description above assumes that each operation in the array consumes a single input and produces
 a single result. Array operations are actually more general than this, as the operations within
@@ -292,7 +292,7 @@ If this explanation isn't clear then look through the stack diagram for the exam
 don't - you'll probably never have cause to use this behaviour!
 
 <pre>imagecli -i yellow.png robin.png robin_gray.png -o ex1_0.png -p '[DUP, hcat] > [vcat, id] > hcat'</pre>
-<img src='images/option-2---operation-arrays/ex1_0.png'/>
+<img src='images/option-2---arrays/ex1_0.png'/>
 
 ```
     |

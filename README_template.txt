@@ -190,7 +190,7 @@ $STACK_DIAGRAM(
   save result
 )$
 
-#### Option 2 - operation arrays
+#### Option 2 - arrays
 
 As manually rotating through the image stack can be a bit verbose, we also support an array syntax
 which applies the *n*th in a series of operations to the *n*th element in the stack. For example,

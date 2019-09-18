@@ -21,7 +21,7 @@ fn dir_name(section: &str) -> String {
 }
 
 /// Reads README_template.md and writes README.md.
-pub fn generate_readme() -> Result<()> {
+pub fn generate_readme(verbose: bool) -> Result<()> {
     let read_path = "README_template.txt";
     let write_path = "README.md";
 
@@ -29,7 +29,7 @@ pub fn generate_readme() -> Result<()> {
         context: format!("Unable to read file '{}", read_path),
     })?;
 
-    let rendered = render_readme(&template)?;
+    let rendered = render_readme(&template, verbose)?;
 
     std::fs::write(write_path, rendered).context(IoError {
         context: format!("Unable to write to file '{}'", write_path),
@@ -38,7 +38,7 @@ pub fn generate_readme() -> Result<()> {
     Ok(())
 }
 
-fn render_readme(template: &str) -> Result<String> {
+fn render_readme(template: &str, verbose: bool) -> Result<String> {
     let mut result = String::new();
     let mut examples = Vec::new();
     let mut current_section = Header {
@@ -76,7 +76,7 @@ fn render_readme(template: &str) -> Result<String> {
     }
 
     for example in &examples {
-        example.run()?;
+        example.run(verbose)?;
     }
 
     let mut operations = String::new();
@@ -109,7 +109,7 @@ fn render_readme(template: &str) -> Result<String> {
                     format!("{}_{}", docs.operation, count),
                 );
                 write!(operations, "{}", instantiated.render_for_documentation())?;
-                instantiated.run()?;
+                instantiated.run(verbose)?;
             }
         }
     }

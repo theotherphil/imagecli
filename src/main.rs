@@ -29,7 +29,7 @@ fn main() {
     let opt = Opt::from_args();
 
     let result = if opt.generate_readme {
-        generate_readme()
+        generate_readme(opt.verbose)
     } else {
         process(&opt.input, &opt.output, opt.pipeline, opt.verbose)
     };

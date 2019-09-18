@@ -109,7 +109,7 @@ impl InstantiatedExample {
     }
 
     /// Run this example and write output files.
-    pub fn run(&self) -> Result<()> {
+    pub fn run(&self, verbose: bool) -> Result<()> {
         let input_paths = self
             .input_file_names
             .iter()
@@ -123,7 +123,7 @@ impl InstantiatedExample {
             .map(|f| Path::new(&self.output_dir).join(f))
             .collect();
 
-        let outputs = run_pipeline(&self.pipeline, inputs, false)?;
+        let outputs = run_pipeline(&self.pipeline, inputs, verbose)?;
 
         if !Path::new(&self.output_dir).is_dir() {
             std::fs::create_dir(&self.output_dir).context(IoError {

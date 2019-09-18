@@ -1064,22 +1064,17 @@ impl ImageOp for Map {
 
 impl_parse!(
     Map,
-    "map (IMAGE_OP)",
+    "map IMAGE_OP",
     "Maps a single operation over the stack.
 
 Equivalent to `[IMAGE_OP, ..]` with length equal to `stack size / number of inputs to IMAGE_OP.`",
     map(
-        preceded(
-            tag("map"),
-            preceded(space1,
-                delimited(tag("("), parse_image_op, tag(")"))
-            )
-        ),
+        preceded(tag("map"), preceded(space1, parse_image_op)),
         Map
     ),
     examples:
-        Example::new(1, 1, "DUP 3 > [id, red, green, blue] > map (gaussian 2.0) > hcat 4"),
-        Example::new(1, 1, "DUP 5 > [id, rotate 10, rotate 20, rotate 30, rotate 40, rotate 50] > map (hcat 3) > vcat")
+        Example::new(1, 1, "DUP 3 > [id, red, green, blue] > map gaussian 2.0 > hcat 4"),
+        Example::new(1, 1, "DUP 5 > [id, rotate 10, rotate 20, rotate 30, rotate 40, rotate 50] > map hcat 3 > vcat")
 );
 
 //-----------------------------------------------------------------------------

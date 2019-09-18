@@ -100,6 +100,7 @@ fn parse_image_op(input: &str) -> IResult<&str, Box<dyn ImageOp>> {
             Rot::parse,
             Rotate::parse,
             Scale::parse,
+            Sequence::parse,
             Sobel::parse,
             map_box!(op_zero("SWAP", Rot(2))),
             Threshold::parse,
@@ -139,6 +140,7 @@ pub fn documentation() -> Vec<Documentation> {
         Rot::documentation(),
         Rotate::documentation(),
         Scale::documentation(),
+        Sequence::documentation(),
         Sobel::documentation(),
         Threshold::documentation(),
         Translate::documentation(),
@@ -1445,6 +1447,52 @@ impl_parse!(
     op_one("scale", float, Scale),
     examples:
         Example::new(1, 1, "scale 0.7")
+);
+
+//-----------------------------------------------------------------------------
+// Sequence
+//-----------------------------------------------------------------------------
+
+#[derive(Debug)]
+struct Sequence(Vec<Box<dyn ImageOp>>);
+
+impl ImageOp for Sequence {
+    fn apply(&self, stack: &mut ImageStack) {
+        for op in &self.0 {
+            op.apply(stack);
+        }
+    }
+
+    fn signature(&self) -> Option<(usize, usize)> {
+        let mut depth = 0isize;
+        let mut max_depth = 0isize;
+
+        for op in &self.0 {
+            let sig = op.signature()?;
+            depth += sig.0 as isize;
+            max_depth = std::cmp::max(depth, max_depth);
+            depth -= sig.1 as isize;
+        }
+
+        Some((max_depth as usize, (max_depth - depth) as usize))
+    }
+}
+
+impl_parse!(
+    Sequence,
+    "(IMAGE_OP > .. )",
+    "Applies a sequence of image operations in order.
+
+The pipeline `(OP1 > OP2)` has exactly the same result as `OP1 > OP2`.
+The purpose of this operation is to allow more flexibility when using arrays (`[..]`)
+or `map` operations.",
+    map(
+        delimited(tag("("), nonempty_sequence(">", parse_image_op), tag(")")),
+        Sequence
+    ),
+    examples:
+        Example::new(1, 1, "scale 0.7 > DUP 3 > [id, hflip, vflip, (hflip > vflip)] > grid 2 2"),
+        Example::new(1, 1, "DUP > map (gray > rotate 30) > hcat")
 );
 
 //-----------------------------------------------------------------------------

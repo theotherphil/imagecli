@@ -147,11 +147,14 @@ $STACK_DIAGRAM(
 )$
 
 This may not be what you wanted! If you want to apply the `gaussian` operation to both of the two
-images in the stack you have two options. The verbose option uses the `SWAP` stack operation to
-manually swap the order of the two elements in the stack. (The less verbose option uses an operation
-array, which is described later). `SWAP` is an alias for `ROT 2`, where the
-`ROT` operation rotates the positions of the top `n` elements of the stack - the top element moves
-`n` positions down the stack and the other the other top elements on the stack move up one.
+images in the stack you have three options.
+
+#### Option 1 - manual stack manipulation
+
+The most flexible (and verbose) option is to use the `SWAP` stack operation to manually swap the order of the two
+elements in the stack. `SWAP` is an alias for `ROT 2`, where the `ROT` operation rotates the
+positions of the top `n` elements of the stack - the top element moves `n` positions down the stack
+and the other top elements on the stack move up one.
 
 $STACK_DIAGRAM(
   STACK first second third
@@ -186,6 +189,8 @@ $STACK_DIAGRAM(
   STACK robin_blurred robin_gray_blurred
   save result
 )$
+
+#### Option 2 - operation arrays
 
 As manually rotating through the image stack can be a bit verbose, we also support an array syntax
 which applies the *n*th in a series of operations to the *n*th element in the stack. For example,
@@ -225,6 +230,27 @@ $STACK_DIAGRAM(
   the two images are horizontally concatenated
   STACK yellows_robins
   save results
+)$
+
+#### Option 3 - map
+
+Finally, you can use the `map` operation.
+
+$EXAMPLE(
+  num_inputs: 2
+  num_outputs: 2
+  pipeline: map gaussian 2.0
+)$
+
+This is equivalent to applying an array of operations whose length is
+equal to the size of the image stack divided by the number of inputs to
+the mapped operation (one for `gaussian`, two for `hcat`, etc.).
+
+The following example demonstrates the effect of mapping an operation that makes
+multiple inputs.
+
+$EXAMPLE(
+  pipeline: DUP 5 > [id, rotate 10, rotate 20, rotate 30, rotate 40, rotate 50] > map hcat 3 > vcat
 )$
 
 ## User-defined functions

@@ -426,6 +426,7 @@ Operation|Usage|Description
 [Rot](#rot)|`ROT [count]`|Rotates the top `count` elements of the stack by 1.
 [Rotate](#rotate)|`rotate <angle>`|Rotates an image clockwise about its center.`angle` gives the angle of rotation in degrees.
 [Scale](#scale)|`scale <ratio>`|Scales image width and height by `ratio`.
+[Sequence](#sequence)|`(IMAGE_OP > .. )`|Applies a sequence of image operations in order.
 [Sobel](#sobel)|`sobel`|Computes image gradients using the Sobel filter.
 [Threshold](#threshold)|`thresh`|Binarises an image using a user-defined threshold.
 [Translate](#translate)|`translate <tx> <ty>`|Translates an image by `(tx, ty)`.
@@ -741,6 +742,23 @@ Scales image width and height by `ratio`.
 
 <pre>imagecli -i robin.png -o Scale_0_0.png -p 'scale 0.7'</pre>
 <img src='images/operations/Scale_0_0.png'/>
+
+### Sequence
+
+Usage: `(IMAGE_OP > .. )`
+
+Applies a sequence of image operations in order.
+
+The pipeline `(OP1 > OP2)` has exactly the same result as `OP1 > OP2`.
+The purpose of this operation is to allow more flexibility when using arrays (`[..]`)
+or `map` operations.
+
+#### Examples
+
+<pre>imagecli -i robin.png -o Sequence_0_0.png -p 'scale 0.7 > DUP 3 > [id, hflip, vflip, (hflip > vflip)] > grid 2 2'</pre>
+<img src='images/operations/Sequence_0_0.png'/>
+<pre>imagecli -i robin.png -o Sequence_1_0.png -p 'DUP > map (gray > rotate 30) > hcat'</pre>
+<img src='images/operations/Sequence_1_0.png'/>
 
 ### Sobel
 

@@ -6,20 +6,20 @@ pub struct Stack<T> {
 }
 
 impl<T: Clone> Stack<T> {
-    /// Create a stack with the given initial elements.
+    /// Creates a stack with the given initial elements.
     /// The top of the stack is the first element of the input.
     pub fn new(contents: Vec<T>) -> Self {
         let contents = contents.into_iter().rev().collect();
         Stack { contents }
     }
 
-    /// Consume the stack and return its elements.
+    /// Consumes the stack and return its elements.
     /// The top of the stack is the first element of the output.
     pub fn contents(self) -> Vec<T> {
         self.contents.into_iter().rev().collect()
     }
 
-    /// duplicates the top element of the stack n times.
+    /// Duplicates the top element of the stack n times.
     ///
     /// dup 1 (a -- a a)
     /// dup 2 (a -- a a a)
@@ -32,7 +32,7 @@ impl<T: Clone> Stack<T> {
         self.contents.push(a);
     }
 
-    /// rotates the top n elements of the stack.
+    /// Rotates the top n elements of the stack.
     /// rot(1) is a no-op, rot(2) swaps the top two elements.
     pub fn rot(&mut self, n: usize) {
         if n < 2 {
@@ -43,13 +43,13 @@ impl<T: Clone> Stack<T> {
         self.contents.insert(self.len() - (n - 1), a);
     }
 
-    /// pops the top of the stack.
+    /// Pops the top of the stack.
     pub fn pop(&mut self) -> T {
         self.assert_stack_size("pop", 1);
         self.contents.pop().unwrap()
     }
 
-    /// pops the to n elements of the stack.
+    /// Pops the to n elements of the stack.
     pub fn pop_n(&mut self, n: usize) -> Vec<T> {
         self.assert_stack_size("pop_n", n);
         // TODO: remove unnecessary work
@@ -58,12 +58,13 @@ impl<T: Clone> Stack<T> {
         popped
     }
 
-    /// pushes onto the top of the stack.
+    /// Pushes onto the top of the stack.
     pub fn push(&mut self, x: T) {
         self.contents.push(x);
     }
 
-    fn len(&self) -> usize {
+    /// The number of items in the stack.
+    pub fn len(&self) -> usize {
         self.contents.len()
     }
 

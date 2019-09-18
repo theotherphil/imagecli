@@ -179,11 +179,14 @@ and pushing the result into a single step.)
 ```
 
 This may not be what you wanted! If you want to apply the `gaussian` operation to both of the two
-images in the stack you have two options. The verbose option uses the `SWAP` stack operation to
-manually swap the order of the two elements in the stack. (The less verbose option uses an operation
-array, which is described later). `SWAP` is an alias for `ROT 2`, where the
-`ROT` operation rotates the positions of the top `n` elements of the stack - the top element moves
-`n` positions down the stack and the other the other top elements on the stack move up one.
+images in the stack you have three options.
+
+#### Option 1 - manual stack manipulation
+
+The most flexible (and verbose) option is to use the `SWAP` stack operation to manually swap the order of the two
+elements in the stack. `SWAP` is an alias for `ROT 2`, where the `ROT` operation rotates the
+positions of the top `n` elements of the stack - the top element moves `n` positions down the stack
+and the other top elements on the stack move up one.
 
 ```
  --------------------
@@ -221,9 +224,9 @@ The following command line uses `SWAP` to apply a Gaussian blur to both input im
 Notice the second `SWAP` operation, which ensures that the outputs are in the same order as the
 inputs.
 
-<pre>imagecli -i robin.png robin_gray.png -o ex1_0.png ex1_1.png -p 'gaussian 5.0 > SWAP > gaussian 5.0 > SWAP'</pre>
-<img src='images/multiple-inputs-multiple-outputs/ex1_0.png'/>
-<img src='images/multiple-inputs-multiple-outputs/ex1_1.png'/>
+<pre>imagecli -i robin.png robin_gray.png -o ex0_0.png ex0_1.png -p 'gaussian 5.0 > SWAP > gaussian 5.0 > SWAP'</pre>
+<img src='images/option-1---manual-stack-manipulation/ex0_0.png'/>
+<img src='images/option-1---manual-stack-manipulation/ex0_1.png'/>
 
 ```
     |
@@ -266,14 +269,16 @@ inputs.
     v
 ```
 
+#### Option 2 - arrays
+
 As manually rotating through the image stack can be a bit verbose, we also support an array syntax
 which applies the *n*th in a series of operations to the *n*th element in the stack. For example,
 the following command line applies a Gaussian blur to the first image, and a blur with larger
 radius to the second.
 
-<pre>imagecli -i robin.png robin_gray.png -o ex2_0.png ex2_1.png -p '[gaussian 2.0, gaussian 6.0]'</pre>
-<img src='images/multiple-inputs-multiple-outputs/ex2_0.png'/>
-<img src='images/multiple-inputs-multiple-outputs/ex2_1.png'/>
+<pre>imagecli -i robin.png robin_gray.png -o ex0_0.png ex0_1.png -p '[gaussian 2.0, gaussian 6.0]'</pre>
+<img src='images/option-2---arrays/ex0_0.png'/>
+<img src='images/option-2---arrays/ex0_1.png'/>
 
 The description above assumes that each operation in the array consumes a single input and produces
 a single result. Array operations are actually more general than this, as the operations within
@@ -286,8 +291,8 @@ as producing no outputs.
 If this explanation isn't clear then look through the stack diagram for the example below. Or
 don't - you'll probably never have cause to use this behaviour!
 
-<pre>imagecli -i yellow.png robin.png robin_gray.png -o ex3_0.png -p '[DUP, hcat] > [vcat, id] > hcat'</pre>
-<img src='images/multiple-inputs-multiple-outputs/ex3_0.png'/>
+<pre>imagecli -i yellow.png robin.png robin_gray.png -o ex1_0.png -p '[DUP, hcat] > [vcat, id] > hcat'</pre>
+<img src='images/option-2---arrays/ex1_0.png'/>
 
 ```
     |
@@ -323,6 +328,24 @@ don't - you'll probably never have cause to use this behaviour!
     | save results
     v
 ```
+
+#### Option 3 - map
+
+Finally, you can use the `map` operation.
+
+<pre>imagecli -i robin.png robin_gray.png -o ex0_0.png ex0_1.png -p 'map gaussian 2.0'</pre>
+<img src='images/option-3---map/ex0_0.png'/>
+<img src='images/option-3---map/ex0_1.png'/>
+
+This is equivalent to applying an array of operations whose length is
+equal to the size of the image stack divided by the number of inputs to
+the mapped operation (one for `gaussian`, two for `hcat`, etc.).
+
+The following example demonstrates the effect of mapping an operation that makes
+multiple inputs.
+
+<pre>imagecli -i robin.png -o ex1_0.png -p 'DUP 5 > [id, rotate 10, rotate 20, rotate 30, rotate 40, rotate 50] > map hcat 3 > vcat'</pre>
+<img src='images/option-3---map/ex1_0.png'/>
 
 ## User-defined functions
 
@@ -394,6 +417,7 @@ Operation|Usage|Description
 [Grid](#grid)|`grid <columns> <rows>`|Arranges a series of images into a grid.
 [HFlip](#hflip)|`hflip`|Flips an image horizontally.
 [Id](#id)|`id`|Applies the identity function, i.e. does nothing.
+[Map](#map)|`map IMAGE_OP`|Maps a single operation over the stack.
 [Median](#median)|`median <x_radius> <y_radius>`|Applies a median filter to an image.
 [OtsuThreshold](#otsuthreshold)|`othresh`|Binarises an image using Otsu thresholding.
 [Overlay](#overlay)|`overlay <left> <top>`|Overlays the second image on the stack onto the first.
@@ -610,6 +634,21 @@ Usage: `id`
 Applies the identity function, i.e. does nothing.
 
 This makes some pipelines more concise to write.
+
+### Map
+
+Usage: `map IMAGE_OP`
+
+Maps a single operation over the stack.
+
+Equivalent to `[IMAGE_OP, ..]` with length equal to `stack size / number of inputs to IMAGE_OP.`
+
+#### Examples
+
+<pre>imagecli -i robin.png -o Map_0_0.png -p 'DUP 3 > [id, red, green, blue] > map gaussian 2.0 > hcat 4'</pre>
+<img src='images/operations/Map_0_0.png'/>
+<pre>imagecli -i robin.png -o Map_1_0.png -p 'DUP 5 > [id, rotate 10, rotate 20, rotate 30, rotate 40, rotate 50] > map hcat 3 > vcat'</pre>
+<img src='images/operations/Map_1_0.png'/>
 
 ### Median
 

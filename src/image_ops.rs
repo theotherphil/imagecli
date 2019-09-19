@@ -104,6 +104,7 @@ fn parse_image_op(input: &str) -> IResult<&str, Box<dyn ImageOp>> {
             Sobel::parse,
             map_box!(op_zero("SWAP", Rot(2))),
             Threshold::parse,
+            Tile::parse,
             Translate::parse,
             map_box!(op_one_opt("vcat", int::<u32>, |x| Grid(1, x.unwrap_or(2)))),
             VFlip::parse,
@@ -143,6 +144,7 @@ pub fn documentation() -> Vec<Documentation> {
         Sequence::documentation(),
         Sobel::documentation(),
         Threshold::documentation(),
+        Tile::documentation(),
         Translate::documentation(),
         VFlip::documentation(),
     ]
@@ -1580,6 +1582,134 @@ Images are first converted to grayscale. Thresholds should be `>=0` and `< 256`.
     op_one("thresh", int::<u8>, Threshold),
     examples:
         Example::new(1, 1, "thresh 120")
+);
+
+//-----------------------------------------------------------------------------
+// Threshold
+//-----------------------------------------------------------------------------
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+struct Tile(u32, u32);
+
+impl ImageOp for Tile {
+    fn apply(&self, stack: &mut ImageStack) {
+        let mut image = stack.pop();
+
+        let tiles = tile(&mut image, self.0, self.1);
+
+        for t in tiles.into_iter().rev() {
+            stack.push(t)
+        }
+    }
+
+    // takes 1, returns n
+    fn signature(&self) -> Option<(usize, usize)> {
+        None
+    }
+}
+
+fn tile(mut image: &mut DynamicImage, width: u32, height: u32) -> Vec<DynamicImage> {
+    let max_elem = (image.width() / width + 1) * (image.height() / height + 1);
+    let mut out: Vec<DynamicImage> = Vec::with_capacity(max_elem as usize);
+
+    let background = match image {
+        ImageLuma8(_) => ImageLuma8(ImageBuffer::from_pixel(width, height, Luma([0]))),
+        ImageLumaA8(_) => ImageLumaA8(ImageBuffer::from_pixel(width, height, LumaA([0, 0]))),
+        ImageRgb8(_) => ImageRgb8(ImageBuffer::from_pixel(width, height, Rgb([0, 0, 0]))),
+        ImageRgba8(_) => ImageRgba8(ImageBuffer::from_pixel(width, height, Rgba([0, 0, 0, 0]))),
+        ImageBgr8(_) => ImageBgr8(ImageBuffer::from_pixel(width, height, Bgr([0, 0, 0]))),
+        ImageBgra8(_) => ImageBgra8(ImageBuffer::from_pixel(width, height, Bgra([0, 0, 0, 0]))),
+    };
+
+    for ymin in (0u32..image.height()).step_by(height as usize) {
+        let ymax = ymin + height;
+
+        for xmin in (0u32..image.width()).step_by(width as usize) {
+            let xmax = xmin + width;
+
+            let crop_spec = Crop {
+                left: xmin,
+                top: ymin,
+                width,
+                height,
+            };
+            let over = dynamic_map!(&mut image, |i| crop(i, &crop_spec));
+
+            if xmax > image.width() || ymax > image.height() {
+                let under = background.clone();
+
+                // todo: this is copied from Overlay, try to factor it out
+                let result = match (under, over) {
+                    (ImageLuma8(mut under), ImageLuma8(over)) => {
+                        image::imageops::overlay(&mut under, &over, 0, 0);
+                        ImageLuma8(under)
+                    }
+                    (ImageLumaA8(mut under), ImageLumaA8(over)) => {
+                        image::imageops::overlay(&mut under, &over, 0, 0);
+                        ImageLumaA8(under)
+                    }
+                    (ImageRgb8(mut under), ImageRgb8(over)) => {
+                        image::imageops::overlay(&mut under, &over, 0, 0);
+                        ImageRgb8(under)
+                    }
+                    (ImageRgba8(mut under), ImageRgba8(over)) => {
+                        image::imageops::overlay(&mut under, &over, 0, 0);
+                        ImageRgba8(under)
+                    }
+                    (ImageBgr8(mut under), ImageBgr8(over)) => {
+                        image::imageops::overlay(&mut under, &over, 0, 0);
+                        ImageBgr8(under)
+                    }
+                    (ImageBgra8(mut under), ImageBgra8(over)) => {
+                        image::imageops::overlay(&mut under, &over, 0, 0);
+                        ImageBgra8(under)
+                    }
+                    // Images are of same type
+                    _ => unreachable!(),
+                };
+                out.push(result);
+            } else {
+                out.push(over);
+            }
+        }
+    }
+
+    out
+}
+
+//impl ImageOp for Crop {
+//    fn apply(&self, stack: &mut ImageStack) {
+//        let mut image = stack.pop();
+//        let cropped = dynamic_map!(&mut image, |i| crop(i, self));
+//        stack.push(cropped);
+//    }
+//
+//    fn signature(&self) -> Option<(usize, usize)> {
+//        Some((1, 1))
+//    }
+//}
+//
+//fn crop<I: GenericImage>(
+//    image: &mut I,
+//    crop: &Crop,
+//) -> ImageBuffer<I::Pixel, Vec<<I::Pixel as Pixel>::Subpixel>>
+//    where
+//        I: 'static,
+//{
+//    image::imageops::crop(image, crop.left, crop.top, crop.width, crop.height).to_image()
+//}
+
+impl_parse!(
+    Tile,
+    "tile",
+    "Splits an image into tiles of the given size in px.
+
+Tiles at the right and bottom will be padded with black if necessary.
+Tiles are pushed onto the stack in reversed row-major order:
+after the operation, the top left tile will be at the top of the stack.",
+    op_two("tile", int::<u32>, int::<u32>, Tile),
+    examples:
+        Example::new(1, 4, "tile 100 150")
 );
 
 //-----------------------------------------------------------------------------

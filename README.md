@@ -421,6 +421,7 @@ Operation|Usage|Description
 [Median](#median)|`median <x_radius> <y_radius>`|Applies a median filter to an image.
 [OtsuThreshold](#otsuthreshold)|`othresh`|Binarises an image using Otsu thresholding.
 [Overlay](#overlay)|`overlay <left> <top>`|Overlays the second image on the stack onto the first.
+[Pad](#pad)|`pad <top> <right> <bottom> <left> '('COLOR')'`|Pads an image with borders of a given size (px) and color.
 [Red](#red)|`red`|Extracts the red channel from an image as a grayscale image.
 [Resize](#resize)|`resize (<width> <height>\|w=<width>\|h=<height>\|w=<width> h=<height>)`|Resizes an image to the given dimensions.
 [Rot](#rot)|`ROT [count]`|Rotates the top `count` elements of the stack by 1.
@@ -688,6 +689,19 @@ cropping if it does not fit.
 
 <pre>imagecli -i robin.png -o Overlay_0_0.png -p 'DUP > const 184 268 (255, 255, 0) > overlay 10 50'</pre>
 <img src='images/operations/Overlay_0_0.png'/>
+
+### Pad
+
+Usage: `pad <top> <right> <bottom> <left> '('COLOR')'`
+
+Pads an image with borders of a given size (px) and color.
+
+`color` can be grayscale: `(12)`, grayscale with alpha: `(12, 255)`, RGB: `(255, 0, 255)`, or RGBA: `(128, 128, 0, 255)`. Note that this consumes an image from the stack.
+
+#### Examples
+
+<pre>imagecli -i robin.png -o Pad_0_0.png -p 'pad 10 20 30 40 (255, 255, 0)'</pre>
+<img src='images/operations/Pad_0_0.png'/>
 
 ### Red
 

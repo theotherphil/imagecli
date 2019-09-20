@@ -429,7 +429,7 @@ Operation|Usage|Description
 [Sequence](#sequence)|`(IMAGE_OP > .. )`|Applies a sequence of image operations in order.
 [Sobel](#sobel)|`sobel`|Computes image gradients using the Sobel filter.
 [Threshold](#threshold)|`thresh`|Binarises an image using a user-defined threshold.
-[Tile](#tile)|`tile`|Splits an image into tiles of the given size in px.
+[Tile](#tile)|`tile <tile_width> <tile_height>`|Splits an image into tiles.
 [Translate](#translate)|`translate <tx> <ty>`|Translates an image by `(tx, ty)`.
 [VFlip](#vflip)|`vflip`|Flips an image vertically.
 
@@ -787,11 +787,11 @@ Images are first converted to grayscale. Thresholds should be `>=0` and `< 256`.
 
 ### Tile
 
-Usage: `tile`
+Usage: `tile <tile_width> <tile_height>`
 
-Splits an image into tiles of the given size in px.
+Splits an image into tiles.
 
-Tiles at the right and bottom will be padded with black if necessary.
+Tiles at the right and bottom may be smaller than the specified size.
 Tiles are pushed onto the stack in reversed row-major order:
 after the operation, the top left tile will be at the top of the stack.
 

@@ -1681,7 +1681,7 @@ Images are first converted to grayscale. Thresholds should be `>=0` and `< 256`.
 );
 
 //-----------------------------------------------------------------------------
-// Threshold
+// Tile
 //-----------------------------------------------------------------------------
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

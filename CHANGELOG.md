@@ -3,10 +3,13 @@
 
 * Minor improvements to README.
 * Improved error reporting.
-* Added Crop operation.
-* Added Overlay operation.
-* Added Map operation.
-* Added Sequence operation.
+* New operations:
+  - Crop
+  - Overlay
+  - Map
+  - Sequence
+  - Pad
+  - Tile
 
 # 0.1.0 (2019-09-15)
 

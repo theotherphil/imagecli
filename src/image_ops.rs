@@ -105,6 +105,7 @@ fn parse_image_op(input: &str) -> IResult<&str, Box<dyn ImageOp>> {
             Sobel::parse,
             map_box!(op_zero("SWAP", Rot(2))),
             Threshold::parse,
+            Tile::parse,
             Translate::parse,
             map_box!(op_one_opt("vcat", int::<u32>, |x| Grid(1, x.unwrap_or(2)))),
             VFlip::parse,
@@ -145,6 +146,7 @@ pub fn documentation() -> Vec<Documentation> {
         Sequence::documentation(),
         Sobel::documentation(),
         Threshold::documentation(),
+        Tile::documentation(),
         Translate::documentation(),
         VFlip::documentation(),
     ]
@@ -1676,6 +1678,67 @@ Images are first converted to grayscale. Thresholds should be `>=0` and `< 256`.
     op_one("thresh", int::<u8>, Threshold),
     examples:
         Example::new(1, 1, "thresh 120")
+);
+
+//-----------------------------------------------------------------------------
+// Threshold
+//-----------------------------------------------------------------------------
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+struct Tile(u32, u32);
+
+impl ImageOp for Tile {
+    fn apply(&self, stack: &mut ImageStack) {
+        let mut image = stack.pop();
+
+        let tiles = tile(&mut image, self.0, self.1);
+
+        for t in tiles.into_iter().rev() {
+            stack.push(t)
+        }
+    }
+
+    /// `None` as the number of outputs is a function of input image size.
+    fn signature(&self) -> Option<(usize, usize)> {
+        None
+    }
+}
+
+fn tile(mut image: &mut DynamicImage, width: u32, height: u32) -> Vec<DynamicImage> {
+    assert!(image.width() > 0);
+    assert!(image.height() > 0);
+    assert!(width > 0);
+    assert!(height > 0);
+    let max_elem = ((image.width() - 1) / width + 1) * ((image.height() - 1) / height + 1);
+    let mut out: Vec<DynamicImage> = Vec::with_capacity(max_elem as usize);
+
+    for ymin in (0u32..image.height()).step_by(height as usize) {
+        for xmin in (0u32..image.width()).step_by(width as usize) {
+            let crop_spec = Crop {
+                left: xmin,
+                top: ymin,
+                width,
+                height,
+            };
+            let cropped = dynamic_map!(&mut image, |i| crop(i, &crop_spec));
+            out.push(cropped);
+        }
+    }
+
+    out
+}
+
+impl_parse!(
+    Tile,
+    "tile <tile_width> <tile_height>",
+    "Splits an image into tiles.
+
+Tiles at the right and bottom may be smaller than the specified size.
+Tiles are pushed onto the stack in reversed row-major order:
+after the operation, the top left tile will be at the top of the stack.",
+    op_two("tile", int::<u32>, int::<u32>, Tile),
+    examples:
+        Example::new(1, 4, "tile 100 150")
 );
 
 //-----------------------------------------------------------------------------

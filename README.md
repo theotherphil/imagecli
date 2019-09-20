@@ -430,6 +430,7 @@ Operation|Usage|Description
 [Sequence](#sequence)|`(IMAGE_OP > .. )`|Applies a sequence of image operations in order.
 [Sobel](#sobel)|`sobel`|Computes image gradients using the Sobel filter.
 [Threshold](#threshold)|`thresh`|Binarises an image using a user-defined threshold.
+[Tile](#tile)|`tile <tile_width> <tile_height>`|Splits an image into tiles.
 [Translate](#translate)|`translate <tx> <ty>`|Translates an image by `(tx, ty)`.
 [VFlip](#vflip)|`vflip`|Flips an image vertically.
 
@@ -797,6 +798,24 @@ Images are first converted to grayscale. Thresholds should be `>=0` and `< 256`.
 
 <pre>imagecli -i robin.png -o Threshold_0_0.png -p 'thresh 120'</pre>
 <img src='images/operations/Threshold_0_0.png'/>
+
+### Tile
+
+Usage: `tile <tile_width> <tile_height>`
+
+Splits an image into tiles.
+
+Tiles at the right and bottom may be smaller than the specified size.
+Tiles are pushed onto the stack in reversed row-major order:
+after the operation, the top left tile will be at the top of the stack.
+
+#### Examples
+
+<pre>imagecli -i robin.png -o Tile_0_0.png Tile_0_1.png Tile_0_2.png Tile_0_3.png -p 'tile 100 150'</pre>
+<img src='images/operations/Tile_0_0.png'/>
+<img src='images/operations/Tile_0_1.png'/>
+<img src='images/operations/Tile_0_2.png'/>
+<img src='images/operations/Tile_0_3.png'/>
 
 ### Translate
 

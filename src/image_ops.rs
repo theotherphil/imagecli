@@ -1227,6 +1227,9 @@ struct Pad {
 
 impl ImageOp for Pad {
     fn apply(&self, stack: &mut ImageStack) {
+        if self.top == 0 && self.right == 0 && self.bottom == 0 && self.left == 0 {
+            return;
+        }
         let over = stack.pop();
 
         let width = self.left + self.right + over.width();
@@ -1238,6 +1241,7 @@ impl ImageOp for Pad {
             Color::Rgb(l) => ImageRgb8(ImageBuffer::from_pixel(width, height, l)),
             Color::Rgba(l) => ImageRgba8(ImageBuffer::from_pixel(width, height, l)),
         };
+        let over = convert_to_color_space(over, color_space(&under));
 
         use DynamicImage::*;
         let result = match (under, over) {
@@ -1283,7 +1287,8 @@ impl_parse!(
     "Pads an image with borders of a given size (px) and color.
 
 `color` can be grayscale: `(12)`, grayscale with alpha: `(12, 255)`, RGB: `(255, 0, 255)`, \
-or RGBA: `(128, 128, 0, 255)`. Note that this consumes an image from the stack.",
+or RGBA: `(128, 128, 0, 255)`. \
+The image will be converted to the color space used here.",
     map(
         preceded(
             tag("pad"),

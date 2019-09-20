@@ -696,7 +696,7 @@ Usage: `pad <top> <right> <bottom> <left> '('COLOR')'`
 
 Pads an image with borders of a given size (px) and color.
 
-`color` can be grayscale: `(12)`, grayscale with alpha: `(12, 255)`, RGB: `(255, 0, 255)`, or RGBA: `(128, 128, 0, 255)`. Note that this consumes an image from the stack.
+`color` can be grayscale: `(12)`, grayscale with alpha: `(12, 255)`, RGB: `(255, 0, 255)`, or RGBA: `(128, 128, 0, 255)`. The image will be converted to the color space used here.
 
 #### Examples
 

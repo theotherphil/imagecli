@@ -95,6 +95,7 @@ fn parse_image_op(input: &str) -> IResult<&str, Box<dyn ImageOp>> {
         )),
         alt((
             Overlay::parse,
+            Pad::parse,
             Red::parse,
             Resize::parse,
             Rot::parse,
@@ -135,6 +136,7 @@ pub fn documentation() -> Vec<Documentation> {
         Median::documentation(),
         OtsuThreshold::documentation(),
         Overlay::documentation(),
+        Pad::documentation(),
         Red::documentation(),
         Resize::documentation(),
         Rot::documentation(),
@@ -1208,6 +1210,100 @@ cropping if it does not fit.",
     op_two("overlay", int::<u32>, int::<u32>, Overlay),
     examples:
         Example::new(1, 1, "DUP > const 184 268 (255, 255, 0) > overlay 10 50")
+);
+
+//-----------------------------------------------------------------------------
+// Pad
+//-----------------------------------------------------------------------------
+
+#[derive(Debug, Clone, PartialEq)]
+struct Pad {
+    top: u32,
+    right: u32,
+    bottom: u32,
+    left: u32,
+    color: Color,
+}
+
+impl ImageOp for Pad {
+    fn apply(&self, stack: &mut ImageStack) {
+        if self.top == 0 && self.right == 0 && self.bottom == 0 && self.left == 0 {
+            return;
+        }
+        let over = stack.pop();
+
+        let width = self.left + self.right + over.width();
+        let height = self.top + self.bottom + over.height();
+
+        let under = match self.color {
+            Color::Luma(l) => ImageLuma8(ImageBuffer::from_pixel(width, height, l)),
+            Color::LumaA(l) => ImageLumaA8(ImageBuffer::from_pixel(width, height, l)),
+            Color::Rgb(l) => ImageRgb8(ImageBuffer::from_pixel(width, height, l)),
+            Color::Rgba(l) => ImageRgba8(ImageBuffer::from_pixel(width, height, l)),
+        };
+        let over = convert_to_color_space(over, color_space(&under));
+
+        use DynamicImage::*;
+        let result = match (under, over) {
+            (ImageLuma8(mut under), ImageLuma8(over)) => {
+                image::imageops::overlay(&mut under, &over, self.left, self.top);
+                ImageLuma8(under)
+            }
+            (ImageLumaA8(mut under), ImageLumaA8(over)) => {
+                image::imageops::overlay(&mut under, &over, self.left, self.top);
+                ImageLumaA8(under)
+            }
+            (ImageRgb8(mut under), ImageRgb8(over)) => {
+                image::imageops::overlay(&mut under, &over, self.left, self.top);
+                ImageRgb8(under)
+            }
+            (ImageRgba8(mut under), ImageRgba8(over)) => {
+                image::imageops::overlay(&mut under, &over, self.left, self.top);
+                ImageRgba8(under)
+            }
+            (ImageBgr8(mut under), ImageBgr8(over)) => {
+                image::imageops::overlay(&mut under, &over, self.left, self.top);
+                ImageBgr8(under)
+            }
+            (ImageBgra8(mut under), ImageBgra8(over)) => {
+                image::imageops::overlay(&mut under, &over, self.left, self.top);
+                ImageBgra8(under)
+            }
+            // Due to the call to convert_to_color_space above
+            _ => unreachable!(),
+        };
+
+        stack.push(result);
+    }
+
+    fn signature(&self) -> Option<(usize, usize)> {
+        Some((1, 1))
+    }
+}
+
+impl_parse!(
+    Pad,
+    "pad <top> <right> <bottom> <left> '('COLOR')'",
+    "Pads an image with borders of a given size (px) and color.
+
+`color` can be grayscale: `(12)`, grayscale with alpha: `(12, 255)`, RGB: `(255, 0, 255)`, \
+or RGBA: `(128, 128, 0, 255)`. \
+The image will be converted to the color space used here.",
+    map(
+        preceded(
+            tag("pad"),
+            tuple((
+                preceded(space1, int::<u32>),
+                preceded(space1, int::<u32>),
+                preceded(space1, int::<u32>),
+                preceded(space1, int::<u32>),
+                preceded(space1, parse_color)
+            ))
+        ),
+        |(top, right, bottom, left, color)| Pad { top, right, bottom, left, color }
+    ),
+    examples:
+        Example::new(1, 1, "pad 10 20 30 40 (255, 255, 0)")
 );
 
 //-----------------------------------------------------------------------------

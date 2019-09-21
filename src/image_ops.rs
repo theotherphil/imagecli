@@ -733,8 +733,7 @@ more information.",
         Example::new(
             1,
             1,
-            "DUP 2 > const 184 268 (255, 255, 0) > DUP > \
-             ROT 3 > func2 { (p + q) / 2 } > ROT 3 > hcat 3"
+            "new 184 268 (255, 255, 0) > MAP DUP > ROT 3 > func2 { (p + q) / 2 } > ROT 3 > hcat 3"
         )
 );
 
@@ -1039,12 +1038,12 @@ impl ImageOp for Map {
         let op = &self.0;
         assert!(
             op.signature().is_some(),
-            "map can only be applied to operations with a fixed number of inputs and outputs"
+            "MAP can only be applied to operations with a fixed number of inputs and outputs"
         );
         let (num_inputs, num_outputs) = op.signature().unwrap();
         assert!(
             num_inputs > 0 && num_outputs > 0,
-            "map can only be applied to operations which consume at least one input and produce \
+            "MAP can only be applied to operations which consume at least one input and produce \
              at least one output"
         );
 
@@ -1070,17 +1069,17 @@ impl ImageOp for Map {
 
 impl_parse!(
     Map,
-    "map IMAGE_OP",
+    "MAP IMAGE_OP",
     "Maps a single operation over the stack.
 
 Equivalent to `[IMAGE_OP, ..]` with length equal to `stack size / number of inputs to IMAGE_OP.`",
     map(
-        preceded(tag("map"), preceded(space1, parse_image_op)),
+        preceded(tag("MAP"), preceded(space1, parse_image_op)),
         Map
     ),
     examples:
-        Example::new(1, 1, "DUP 3 > [id, red, green, blue] > map gaussian 2.0 > hcat 4"),
-        Example::new(1, 1, "DUP 5 > [id, rotate 10, rotate 20, rotate 30, rotate 40, rotate 50] > map hcat 3 > vcat")
+        Example::new(1, 1, "DUP 3 > [id, red, green, blue] > MAP gaussian 2.0 > hcat 4"),
+        Example::new(1, 1, "DUP 5 > [id, rotate 10, rotate 20, rotate 30, rotate 40, rotate 50] > MAP hcat 3 > vcat")
 );
 
 //-----------------------------------------------------------------------------
@@ -1264,7 +1263,7 @@ Places the second image with its top left corner at `(left, top )` on the first 
 cropping if it does not fit.",
     op_two("overlay", int::<u32>, int::<u32>, Overlay),
     examples:
-        Example::new(1, 1, "DUP > const 184 268 (255, 255, 0) > overlay 10 50")
+        Example::new(1, 1, "new 184 268 (255, 255, 0) > overlay 10 50")
 );
 
 //-----------------------------------------------------------------------------
@@ -1643,7 +1642,7 @@ or `map` operations.",
     ),
     examples:
         Example::new(1, 1, "scale 0.7 > DUP 3 > [id, hflip, vflip, (hflip > vflip)] > grid 2 2"),
-        Example::new(1, 1, "DUP > map (gray > rotate 30) > hcat")
+        Example::new(1, 1, "DUP > MAP (gray > rotate 30) > hcat")
 );
 
 //-----------------------------------------------------------------------------

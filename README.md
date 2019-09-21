@@ -331,9 +331,9 @@ don't - you'll probably never have cause to use this behaviour!
 
 #### Option 3 - map
 
-Finally, you can use the `map` operation.
+Finally, you can use the `MAP` operation.
 
-<pre>imagecli -i robin.png robin_gray.png -o ex0_0.png ex0_1.png -p 'map gaussian 2.0'</pre>
+<pre>imagecli -i robin.png robin_gray.png -o ex0_0.png ex0_1.png -p 'MAP gaussian 2.0'</pre>
 <img src='images/option-3---map/ex0_0.png'/>
 <img src='images/option-3---map/ex0_1.png'/>
 
@@ -344,7 +344,7 @@ the mapped operation (one for `gaussian`, two for `hcat`, etc.).
 The following example demonstrates the effect of mapping an operation that makes
 multiple inputs.
 
-<pre>imagecli -i robin.png -o ex1_0.png -p 'DUP 5 > [id, rotate 10, rotate 20, rotate 30, rotate 40, rotate 50] > map hcat 3 > vcat'</pre>
+<pre>imagecli -i robin.png -o ex1_0.png -p 'DUP 5 > [id, rotate 10, rotate 20, rotate 30, rotate 40, rotate 50] > MAP hcat 3 > vcat'</pre>
 <img src='images/option-3---map/ex1_0.png'/>
 
 ## User-defined functions
@@ -375,7 +375,7 @@ grayscale - otherwise the threshold would be applied independently to each chann
 
 Our final example uses `func2` to apply a user-defined function to a pair of images.
 
-<pre>imagecli -i robin.png -o ex2_0.png -p 'DUP 2 > const 184 268 (255, 255, 0) > DUP > ROT 3 > func2 { (p + q) / 2 } > ROT 3 > hcat 3'</pre>
+<pre>imagecli -i robin.png -o ex2_0.png -p 'new 184 268 (255, 255, 0) > MAP DUP > ROT 3 > func2 { (p + q) / 2 } > ROT 3 > hcat 3'</pre>
 <img src='images/user-defined-functions/ex2_0.png'/>
 
 Current limitations:
@@ -417,7 +417,7 @@ Operation|Usage|Description
 [Grid](#grid)|`grid <columns> <rows>`|Arranges a series of images into a grid.
 [HFlip](#hflip)|`hflip`|Flips an image horizontally.
 [Id](#id)|`id`|Applies the identity function, i.e. does nothing.
-[Map](#map)|`map IMAGE_OP`|Maps a single operation over the stack.
+[Map](#map)|`MAP IMAGE_OP`|Maps a single operation over the stack.
 [Median](#median)|`median <x_radius> <y_radius>`|Applies a median filter to an image.
 [New](#new)|`new <width> <height> '('COLOR')'`|Creates an image with a single constant value.
 [OtsuThreshold](#otsuthreshold)|`othresh`|Binarises an image using Otsu thresholding.
@@ -563,7 +563,7 @@ See the [user-defined functions](#user-defined-functions) section of the user gu
 
 #### Examples
 
-<pre>imagecli -i robin.png -o Func2_0_0.png -p 'DUP 2 > const 184 268 (255, 255, 0) > DUP > ROT 3 > func2 { (p + q) / 2 } > ROT 3 > hcat 3'</pre>
+<pre>imagecli -i robin.png -o Func2_0_0.png -p 'new 184 268 (255, 255, 0) > MAP DUP > ROT 3 > func2 { (p + q) / 2 } > ROT 3 > hcat 3'</pre>
 <img src='images/operations/Func2_0_0.png'/>
 
 ### Func3
@@ -643,7 +643,7 @@ This makes some pipelines more concise to write.
 
 ### Map
 
-Usage: `map IMAGE_OP`
+Usage: `MAP IMAGE_OP`
 
 Maps a single operation over the stack.
 
@@ -651,9 +651,9 @@ Equivalent to `[IMAGE_OP, ..]` with length equal to `stack size / number of inpu
 
 #### Examples
 
-<pre>imagecli -i robin.png -o Map_0_0.png -p 'DUP 3 > [id, red, green, blue] > map gaussian 2.0 > hcat 4'</pre>
+<pre>imagecli -i robin.png -o Map_0_0.png -p 'DUP 3 > [id, red, green, blue] > MAP gaussian 2.0 > hcat 4'</pre>
 <img src='images/operations/Map_0_0.png'/>
-<pre>imagecli -i robin.png -o Map_1_0.png -p 'DUP 5 > [id, rotate 10, rotate 20, rotate 30, rotate 40, rotate 50] > map hcat 3 > vcat'</pre>
+<pre>imagecli -i robin.png -o Map_1_0.png -p 'DUP 5 > [id, rotate 10, rotate 20, rotate 30, rotate 40, rotate 50] > MAP hcat 3 > vcat'</pre>
 <img src='images/operations/Map_1_0.png'/>
 
 ### Median
@@ -706,7 +706,7 @@ cropping if it does not fit.
 
 #### Examples
 
-<pre>imagecli -i robin.png -o Overlay_0_0.png -p 'DUP > const 184 268 (255, 255, 0) > overlay 10 50'</pre>
+<pre>imagecli -i robin.png -o Overlay_0_0.png -p 'new 184 268 (255, 255, 0) > overlay 10 50'</pre>
 <img src='images/operations/Overlay_0_0.png'/>
 
 ### Pad
@@ -790,7 +790,7 @@ or `map` operations.
 
 <pre>imagecli -i robin.png -o Sequence_0_0.png -p 'scale 0.7 > DUP 3 > [id, hflip, vflip, (hflip > vflip)] > grid 2 2'</pre>
 <img src='images/operations/Sequence_0_0.png'/>
-<pre>imagecli -i robin.png -o Sequence_1_0.png -p 'DUP > map (gray > rotate 30) > hcat'</pre>
+<pre>imagecli -i robin.png -o Sequence_1_0.png -p 'DUP > MAP (gray > rotate 30) > hcat'</pre>
 <img src='images/operations/Sequence_1_0.png'/>
 
 ### Sobel

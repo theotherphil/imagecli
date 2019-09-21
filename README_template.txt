@@ -234,12 +234,12 @@ $STACK_DIAGRAM(
 
 #### Option 3 - map
 
-Finally, you can use the `map` operation.
+Finally, you can use the `MAP` operation.
 
 $EXAMPLE(
   num_inputs: 2
   num_outputs: 2
-  pipeline: map gaussian 2.0
+  pipeline: MAP gaussian 2.0
 )$
 
 This is equivalent to applying an array of operations whose length is
@@ -250,7 +250,7 @@ The following example demonstrates the effect of mapping an operation that makes
 multiple inputs.
 
 $EXAMPLE(
-  pipeline: DUP 5 > [id, rotate 10, rotate 20, rotate 30, rotate 40, rotate 50] > map hcat 3 > vcat
+  pipeline: DUP 5 > [id, rotate 10, rotate 20, rotate 30, rotate 40, rotate 50] > MAP hcat 3 > vcat
 )$
 
 ## User-defined functions
@@ -284,7 +284,7 @@ $EXAMPLE(
 Our final example uses `func2` to apply a user-defined function to a pair of images.
 
 $EXAMPLE(
-  pipeline: DUP 2 > const 184 268 (255, 255, 0) > DUP > ROT 3 > func2 { (p + q) / 2 } > ROT 3 > hcat 3
+  pipeline: new 184 268 (255, 255, 0) > MAP DUP > ROT 3 > func2 { (p + q) / 2 } > ROT 3 > hcat 3
 )$
 
 Current limitations:

@@ -91,9 +91,10 @@ fn parse_image_op(input: &str) -> IResult<&str, Box<dyn ImageOp>> {
             Id::parse,
             Map::parse,
             Median::parse,
-            OtsuThreshold::parse,
+            New::parse,
         )),
         alt((
+            OtsuThreshold::parse,
             Overlay::parse,
             Pad::parse,
             Red::parse,
@@ -135,6 +136,7 @@ pub fn documentation() -> Vec<Documentation> {
         Id::documentation(),
         Map::documentation(),
         Median::documentation(),
+        New::documentation(),
         OtsuThreshold::documentation(),
         Overlay::documentation(),
         Pad::documentation(),
@@ -502,11 +504,6 @@ or RGBA: `(128, 128, 0, 255)`.",
 // Const
 //-----------------------------------------------------------------------------
 
-// TODO: Over-writing with const means you have to do some awkward stack manipulation
-// TODO: if you want to combine the constant image with your inputs.
-// TODO: Maybe it would be better to allow constant images as 'pseudo-inputs', which get
-// TODO: injected at the start of the pipeline, rather than manipulating the existing stack.
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct Const {
     width: u32,
@@ -534,10 +531,13 @@ impl ImageOp for Const {
 impl_parse!(
     Const,
     "const <width> <height> '('COLOR')'",
-    "Creates an image with a single constant value.
+    "Replaces the top of the image stack with an image with a single constant value.
 
 `color` can be grayscale: `(12)`, grayscale with alpha: `(12, 255)`, RGB: `(255, 0, 255)`, \
-or RGBA: `(128, 128, 0, 255)`. Note that this consumes an image from the stack.",
+or RGBA: `(128, 128, 0, 255)`.
+
+Note that this consumes an image from the stack. If this is not the behaviour you want then \
+use the `new` operation.",
     map(
         preceded(
             tag("const"),
@@ -733,8 +733,7 @@ more information.",
         Example::new(
             1,
             1,
-            "DUP 2 > const 184 268 (255, 255, 0) > DUP > \
-             ROT 3 > func2 { (p + q) / 2 } > ROT 3 > hcat 3"
+            "new 184 268 (255, 255, 0) > MAP DUP > ROT 3 > func2 { (p + q) / 2 } > ROT 3 > hcat 3"
         )
 );
 
@@ -1039,12 +1038,12 @@ impl ImageOp for Map {
         let op = &self.0;
         assert!(
             op.signature().is_some(),
-            "map can only be applied to operations with a fixed number of inputs and outputs"
+            "MAP can only be applied to operations with a fixed number of inputs and outputs"
         );
         let (num_inputs, num_outputs) = op.signature().unwrap();
         assert!(
             num_inputs > 0 && num_outputs > 0,
-            "map can only be applied to operations which consume at least one input and produce \
+            "MAP can only be applied to operations which consume at least one input and produce \
              at least one output"
         );
 
@@ -1070,17 +1069,17 @@ impl ImageOp for Map {
 
 impl_parse!(
     Map,
-    "map IMAGE_OP",
+    "MAP IMAGE_OP",
     "Maps a single operation over the stack.
 
 Equivalent to `[IMAGE_OP, ..]` with length equal to `stack size / number of inputs to IMAGE_OP.`",
     map(
-        preceded(tag("map"), preceded(space1, parse_image_op)),
+        preceded(tag("MAP"), preceded(space1, parse_image_op)),
         Map
     ),
     examples:
-        Example::new(1, 1, "DUP 3 > [id, red, green, blue] > map gaussian 2.0 > hcat 4"),
-        Example::new(1, 1, "DUP 5 > [id, rotate 10, rotate 20, rotate 30, rotate 40, rotate 50] > map hcat 3 > vcat")
+        Example::new(1, 1, "DUP 3 > [id, red, green, blue] > MAP gaussian 2.0 > hcat 4"),
+        Example::new(1, 1, "DUP 5 > [id, rotate 10, rotate 20, rotate 30, rotate 40, rotate 50] > MAP hcat 3 > vcat")
 );
 
 //-----------------------------------------------------------------------------
@@ -1112,6 +1111,59 @@ The filter applied has width `2 * x_radius + 1` and height `2 * y_radius + 1`.",
     op_two("median", int::<u32>, int::<u32>, Median),
     examples:
         Example::new(1, 1, "median 4 4")
+);
+
+//-----------------------------------------------------------------------------
+// New
+//-----------------------------------------------------------------------------
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct New {
+    width: u32,
+    height: u32,
+    color: Color,
+}
+
+impl ImageOp for New {
+    fn apply(&self, stack: &mut ImageStack) {
+        let constant = match self.color {
+            Color::Luma(l) => ImageLuma8(ImageBuffer::from_pixel(self.width, self.height, l)),
+            Color::LumaA(l) => ImageLumaA8(ImageBuffer::from_pixel(self.width, self.height, l)),
+            Color::Rgb(l) => ImageRgb8(ImageBuffer::from_pixel(self.width, self.height, l)),
+            Color::Rgba(l) => ImageRgba8(ImageBuffer::from_pixel(self.width, self.height, l)),
+        };
+        stack.push(constant);
+    }
+
+    fn signature(&self) -> Option<(usize, usize)> {
+        Some((1, 1))
+    }
+}
+
+impl_parse!(
+    New,
+    "new <width> <height> '('COLOR')'",
+    "Creates an image with a single constant value.
+
+`color` can be grayscale: `(12)`, grayscale with alpha: `(12, 255)`, RGB: `(255, 0, 255)`, \
+or RGBA: `(128, 128, 0, 255)`.
+
+Note that this operation consumes no inputs - it just pushes a new image onto the stack. \
+If you want to replace the top image on the stack with a constant value then use the `const` \
+operation.",
+    map(
+        preceded(
+            tag("new"),
+            tuple((
+                preceded(space1, int::<u32>),
+                preceded(space1, int::<u32>),
+                preceded(space1, parse_color)
+            ))
+        ),
+        |(width, height, color)| New { width, height, color }
+    ),
+    examples:
+        Example::new(0, 1, "new 200 150 (0, 0, 255)")
 );
 
 //-----------------------------------------------------------------------------
@@ -1211,7 +1263,7 @@ Places the second image with its top left corner at `(left, top )` on the first 
 cropping if it does not fit.",
     op_two("overlay", int::<u32>, int::<u32>, Overlay),
     examples:
-        Example::new(1, 1, "DUP > const 184 268 (255, 255, 0) > overlay 10 50")
+        Example::new(1, 1, "new 184 268 (255, 255, 0) > overlay 10 50")
 );
 
 //-----------------------------------------------------------------------------
@@ -1590,7 +1642,7 @@ or `map` operations.",
     ),
     examples:
         Example::new(1, 1, "scale 0.7 > DUP 3 > [id, hflip, vflip, (hflip > vflip)] > grid 2 2"),
-        Example::new(1, 1, "DUP > map (gray > rotate 30) > hcat")
+        Example::new(1, 1, "DUP > MAP (gray > rotate 30) > hcat")
 );
 
 //-----------------------------------------------------------------------------

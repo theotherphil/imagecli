@@ -405,7 +405,7 @@ Operation|Usage|Description
 [Blue](#blue)|`blue`|Extracts the blue channel from an image as a grayscale image.
 [Carve](#carve)|`carve <width_ratio>`|Shrinks an image's width using seam carving.
 [Circle](#circle)|`circle <filltype> <cx> <cy> <radius> '('COLOR')'`|Draws a circle on an image.
-[Const](#const)|`const <width> <height> '('COLOR')'`|Creates an image with a single constant value.
+[Const](#const)|`const <width> <height> '('COLOR')'`|Replaces the top of the image stack with an image with a single constant value.
 [Crop](#crop)|`crop <left> <top> <width> <height>`|Extracts a rectangular region from an image.
 [Dup](#dup)|`DUP [count]`|Duplicates the top element of the image stack `count` times. `count` defaults to 1 if not provided.
 [Func](#func)|`func { EXPR }`|Applies a user-provided function to each subpixel in an image.
@@ -419,6 +419,7 @@ Operation|Usage|Description
 [Id](#id)|`id`|Applies the identity function, i.e. does nothing.
 [Map](#map)|`map IMAGE_OP`|Maps a single operation over the stack.
 [Median](#median)|`median <x_radius> <y_radius>`|Applies a median filter to an image.
+[New](#new)|`new <width> <height> '('COLOR')'`|Creates an image with a single constant value.
 [OtsuThreshold](#otsuthreshold)|`othresh`|Binarises an image using Otsu thresholding.
 [Overlay](#overlay)|`overlay <left> <top>`|Overlays the second image on the stack onto the first.
 [Pad](#pad)|`pad <top> <right> <bottom> <left> '('COLOR')'`|Pads an image with borders of a given size (px) and color.
@@ -506,9 +507,11 @@ Draws a circle on an image.
 
 Usage: `const <width> <height> '('COLOR')'`
 
-Creates an image with a single constant value.
+Replaces the top of the image stack with an image with a single constant value.
 
-`color` can be grayscale: `(12)`, grayscale with alpha: `(12, 255)`, RGB: `(255, 0, 255)`, or RGBA: `(128, 128, 0, 255)`. Note that this consumes an image from the stack.
+`color` can be grayscale: `(12)`, grayscale with alpha: `(12, 255)`, RGB: `(255, 0, 255)`, or RGBA: `(128, 128, 0, 255)`.
+
+Note that this consumes an image from the stack. If this is not the behaviour you want then use the `new` operation.
 
 #### Examples
 
@@ -665,6 +668,21 @@ The filter applied has width `2 * x_radius + 1` and height `2 * y_radius + 1`.
 
 <pre>imagecli -i robin.png -o Median_0_0.png -p 'median 4 4'</pre>
 <img src='images/operations/Median_0_0.png'/>
+
+### New
+
+Usage: `new <width> <height> '('COLOR')'`
+
+Creates an image with a single constant value.
+
+`color` can be grayscale: `(12)`, grayscale with alpha: `(12, 255)`, RGB: `(255, 0, 255)`, or RGBA: `(128, 128, 0, 255)`.
+
+Note that this operation consumes no inputs - it just pushes a new image onto the stack. If you want to replace the top image on the stack with a constant value then use the `const` operation.
+
+#### Examples
+
+<pre>imagecli -o New_0_0.png -p 'new 200 150 (0, 0, 255)'</pre>
+<img src='images/operations/New_0_0.png'/>
 
 ### OtsuThreshold
 

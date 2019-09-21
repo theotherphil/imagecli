@@ -143,15 +143,19 @@ impl InstantiatedExample {
             Style::LongForm => ("--input", "--output", "--pipeline"),
             Style::ShortForm => ("-i", "-o", "-p"),
         };
+        let input = if !self.input_file_names.is_empty() {
+            format!(" {} {}", input_opt, self.input_file_names.join(" "))
+        } else {
+            String::new()
+        };
         let pipeline = if !self.pipeline.is_empty() {
             format!(" {} '{}'", pipeline_opt, self.pipeline)
         } else {
             String::new()
         };
         format!(
-            "imagecli {} {} {} {}{}",
-            input_opt,
-            self.input_file_names.join(" "),
+            "imagecli{} {} {}{}",
+            input,
             output_opt,
             self.output_file_names.join(" "),
             pipeline,

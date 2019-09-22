@@ -27,7 +27,7 @@ impl OutputSpec {
             }
             OutputSpec::Pattern(paths[0].to_string(), 3)
         } else {
-            OutputSpec::Paths(paths.iter().cloned().collect())
+            OutputSpec::Paths(paths.to_vec())
         };
         Ok(spec)
     }

@@ -15,13 +15,13 @@
 
 use image::{open, DynamicImage, GenericImageView};
 use snafu::ResultExt;
-use std::path::PathBuf;
 
 pub mod documentation;
 pub mod error;
-use crate::error::{ImageOpenError, ImageSaveError, Result};
+use crate::error::{ImageCliError, ImageOpenError, ImageSaveError, Result};
 mod example;
 mod expr;
+use glob::glob;
 pub mod image_ops;
 use image_ops::parse;
 mod parse_utils;
@@ -38,14 +38,15 @@ pub type ImageStack = stack::Stack<DynamicImage>;
 
 /// Load inputs, run the pipeline, and save the results.
 pub fn process(
-    input_paths: &[PathBuf],
-    output_paths: &[PathBuf],
+    input_patterns: &[String],
+    output_patterns: &[String],
     pipeline: Option<String>,
     verbose: bool,
 ) -> Result<()> {
     // Load inputs
     let mut inputs = Vec::new();
-    for path in input_paths.iter() {
+    for path in input_patterns.iter().flat_map(|p| glob(p).unwrap()).map(|p| p.unwrap()) {
+        let path = &path;
         let image = open(path).context(ImageOpenError { path })?;
         if verbose {
             println!(
@@ -66,19 +67,44 @@ pub fn process(
     let outputs = run_pipeline(&pipeline, inputs, verbose)?;
 
     // Save results
-    for (path, image) in output_paths.iter().zip(outputs) {
-        if verbose {
-            println!(
-                "Output image {:?} (width: {}, height: {})",
-                path,
-                image.width(),
-                image.height()
-            );
+    let using_index_var = output_patterns.iter().any(|p| p.contains("$N"));
+    if using_index_var  {
+        if output_patterns.len() != 1 {
+            return Err(ImageCliError::InvalidArgError {
+                context: "If --outputs contains a path containing $N then it cannot \
+                contain any other paths.".into()
+            })
         }
-        image.save(path).context(ImageSaveError { path })?;
+        let output_pattern = &output_patterns[0];
+        for (index, image) in outputs.iter().enumerate() {
+            println!("INDEX: {}", index);
+            let path = output_pattern.replace("$N", &index.to_string());
+            let path = &path;
+            println!("PATH: {}", path);
+            if verbose {
+                log_output(image, path);
+            }
+            image.save(path).context(ImageSaveError { path })?;
+        }
+    } else {
+        for (path, image) in output_patterns.iter().zip(outputs) {
+            if verbose {
+                log_output(&image, path);
+            }
+            image.save(path).context(ImageSaveError { path })?;
+        }
     }
 
     Ok(())
+}
+
+fn log_output(image: &DynamicImage, path: &str) {
+    println!(
+        "Output image {:?} (width: {}, height: {})",
+        path,
+        image.width(),
+        image.height()
+    );
 }
 
 /// Run an image processing pipeline on a stack with the given initial contents.

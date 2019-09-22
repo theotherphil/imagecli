@@ -10,6 +10,7 @@ license = "MIT"
 exclude = ["images/*"]
 
 [dependencies]
+glob = "0.3.0"
 image = "0.22.2"
 imageproc = "0.19.1"
 nom = "5.0.1"

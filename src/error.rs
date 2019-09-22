@@ -42,6 +42,12 @@ pub enum ImageCliError {
         remaining)
     )]
     PipelineParseError { consumed: String, remaining: String },
+
+    /// An error from any other issue with user-provided arguments.
+    #[snafu(display("{}", context))]
+    InvalidArgError {
+        context: String,
+    },
 }
 
 impl From<std::fmt::Error> for ImageCliError {

@@ -89,7 +89,7 @@ fn render_readme(template: &str, verbose: bool) -> Result<String> {
             vec![
                 markdown_internal_link(&doc.operation),
                 format!("`{}`", doc.usage.replace("|", "\\|")),
-                doc.explanation.split("\n").nth(0).unwrap().into(),
+                doc.explanation.split('\n').nth(0).unwrap().into(),
             ]
         },
     );
@@ -100,7 +100,7 @@ fn render_readme(template: &str, verbose: bool) -> Result<String> {
         writeln!(operations, "\n### {}\n", docs.operation)?;
         writeln!(operations, "Usage: `{}`\n", docs.usage)?;
         writeln!(operations, "{}", docs.explanation)?;
-        if docs.examples.len() > 0 {
+        if !docs.examples.is_empty() {
             writeln!(operations, "\n#### Examples\n")?;
             for (count, example) in docs.examples.iter().enumerate() {
                 let instantiated = example.instantiate(

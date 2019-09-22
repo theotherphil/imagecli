@@ -18,7 +18,14 @@ use snafu::ResultExt;
 
 pub mod documentation;
 pub mod error;
-use crate::error::{ImageCliError, ImageOpenError, ImageSaveError, Result};
+use crate::error::{
+    GlobIterationError,
+    GlobPatternError,
+    ImageCliError,
+    ImageOpenError,
+    ImageSaveError,
+    Result
+};
 mod example;
 mod expr;
 use glob::glob;
@@ -45,7 +52,17 @@ pub fn process(
 ) -> Result<()> {
     // Load inputs
     let mut inputs = Vec::new();
-    for path in input_patterns.iter().flat_map(|p| glob(p).unwrap()).map(|p| p.unwrap()) {
+
+    let paths = input_patterns
+        .iter()
+        .map(|pattern| glob(pattern).context(GlobPatternError { pattern }))
+        .collect::<Result<Vec<_>>>()?
+        .into_iter()
+        .flatten()
+        .map(|path| path.context(GlobIterationError))
+        .collect::<Result<Vec<_>>>()?;
+
+    for path in paths {
         let path = &path;
         let image = open(path).context(ImageOpenError { path })?;
         if verbose {

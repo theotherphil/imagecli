@@ -48,7 +48,7 @@ pub struct Header {
 /// Finds header rows in a markdown file.
 /// Currently only recognises headers with leading #s.
 pub fn find_headers(contents: &str) -> Vec<Header> {
-    contents.split("\n").filter_map(header).collect()
+    contents.split('\n').filter_map(header).collect()
 }
 
 /// Checks whether a line in a markdown file is a header.

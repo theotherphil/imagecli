@@ -19,12 +19,7 @@ use snafu::ResultExt;
 pub mod documentation;
 pub mod error;
 use crate::error::{
-    GlobIterationError,
-    GlobPatternError,
-    ImageCliError,
-    ImageOpenError,
-    ImageSaveError,
-    Result
+    GlobIterationError, GlobPatternError, ImageCliError, ImageOpenError, ImageSaveError, Result,
 };
 mod example;
 mod expr;
@@ -85,12 +80,13 @@ pub fn process(
 
     // Save results
     let using_index_var = output_patterns.iter().any(|p| p.contains("$N"));
-    if using_index_var  {
+    if using_index_var {
         if output_patterns.len() != 1 {
             return Err(ImageCliError::InvalidArgError {
                 context: "If --outputs contains a path containing $N then it cannot \
-                contain any other paths.".into()
-            })
+                          contain any other paths."
+                    .into(),
+            });
         }
         let output_pattern = &output_patterns[0];
         for (index, image) in outputs.iter().enumerate() {

@@ -52,15 +52,11 @@ pub enum ImageCliError {
 
     /// An when iterating files matching a glob.
     #[snafu(display("Error iterating glob results. Path: {:?}. Error: {}", source.path(), source.error()))]
-    GlobIterationError {
-        source: glob::GlobError,
-    },
+    GlobIterationError { source: glob::GlobError },
 
     /// An error from any other issue with user-provided arguments.
     #[snafu(display("{}", context))]
-    InvalidArgError {
-        context: String,
-    },
+    InvalidArgError { context: String },
 }
 
 impl From<std::fmt::Error> for ImageCliError {

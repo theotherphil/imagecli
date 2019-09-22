@@ -18,9 +18,7 @@ use snafu::ResultExt;
 
 pub mod documentation;
 pub mod error;
-use crate::error::{
-    GlobIterationError, GlobPatternError, ImageOpenError, ImageSaveError, Result,
-};
+use crate::error::{GlobIterationError, GlobPatternError, ImageOpenError, ImageSaveError, Result};
 mod example;
 mod expr;
 use glob::glob;
@@ -80,7 +78,6 @@ pub fn run_pipeline(
     Ok(stack.contents())
 }
 
-
 fn load_inputs(input_patterns: &[String], verbose: bool) -> Result<Vec<DynamicImage>> {
     let mut inputs = Vec::new();
 
@@ -117,8 +114,8 @@ fn save_images(spec: &OutputSpec, images: &[DynamicImage], verbose: bool) -> Res
                     log_output(&image, &path);
                 }
                 image.save(&path).context(ImageSaveError { path: &path })?;
-            },
-            None => break
+            }
+            None => break,
         }
     }
     Ok(())

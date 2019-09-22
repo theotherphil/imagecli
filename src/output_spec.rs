@@ -1,4 +1,3 @@
-
 use crate::error::{ImageCliError, Result};
 
 /// Defines the paths to use when saving output images.
@@ -36,12 +35,8 @@ impl OutputSpec {
     /// Returns the path to use when saving the `n`th image in the stack.
     pub fn nth_output_path(&self, n: usize) -> Option<String> {
         match self {
-            OutputSpec::Paths(paths) => {
-                paths.get(n).map(|p| p.to_string())
-            },
-            OutputSpec::Pattern(pattern, _width) => {
-                Some(pattern.replace("$N", &n.to_string()))
-            }
+            OutputSpec::Paths(paths) => paths.get(n).map(|p| p.to_string()),
+            OutputSpec::Pattern(pattern, _width) => Some(pattern.replace("$N", &n.to_string())),
         }
     }
 }

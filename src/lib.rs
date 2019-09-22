@@ -19,13 +19,15 @@ use snafu::ResultExt;
 pub mod documentation;
 pub mod error;
 use crate::error::{
-    GlobIterationError, GlobPatternError, ImageCliError, ImageOpenError, ImageSaveError, Result,
+    GlobIterationError, GlobPatternError, ImageOpenError, ImageSaveError, Result,
 };
 mod example;
 mod expr;
 use glob::glob;
 pub mod image_ops;
 use image_ops::parse;
+mod output_spec;
+use output_spec::OutputSpec;
 mod parse_utils;
 mod stack;
 
@@ -45,79 +47,18 @@ pub fn process(
     pipeline: Option<String>,
     verbose: bool,
 ) -> Result<()> {
-    // Load inputs
-    let mut inputs = Vec::new();
+    let inputs = load_inputs(input_patterns, verbose)?;
+    let output_spec = OutputSpec::parse(output_patterns)?;
 
-    let paths = input_patterns
-        .iter()
-        .map(|pattern| glob(pattern).context(GlobPatternError { pattern }))
-        .collect::<Result<Vec<_>>>()?
-        .into_iter()
-        .flatten()
-        .map(|path| path.context(GlobIterationError))
-        .collect::<Result<Vec<_>>>()?;
-
-    for path in paths {
-        let path = &path;
-        let image = open(path).context(ImageOpenError { path })?;
-        if verbose {
-            println!(
-                "Loaded input {:?} (width: {}, height: {})",
-                path,
-                image.width(),
-                image.height()
-            );
-        }
-        inputs.push(image);
-    }
-
-    // Run pipeline
     let pipeline = match pipeline {
         Some(p) => p.clone(),
         None => "".into(),
     };
-    let outputs = run_pipeline(&pipeline, inputs, verbose)?;
 
-    // Save results
-    let using_index_var = output_patterns.iter().any(|p| p.contains("$N"));
-    if using_index_var {
-        if output_patterns.len() != 1 {
-            return Err(ImageCliError::InvalidArgError {
-                context: "If --outputs contains a path containing $N then it cannot \
-                          contain any other paths."
-                    .into(),
-            });
-        }
-        let output_pattern = &output_patterns[0];
-        for (index, image) in outputs.iter().enumerate() {
-            println!("INDEX: {}", index);
-            let path = output_pattern.replace("$N", &index.to_string());
-            let path = &path;
-            println!("PATH: {}", path);
-            if verbose {
-                log_output(image, path);
-            }
-            image.save(path).context(ImageSaveError { path })?;
-        }
-    } else {
-        for (path, image) in output_patterns.iter().zip(outputs) {
-            if verbose {
-                log_output(&image, path);
-            }
-            image.save(path).context(ImageSaveError { path })?;
-        }
-    }
+    let outputs = run_pipeline(&pipeline, inputs, verbose)?;
+    save_images(&output_spec, &outputs, verbose)?;
 
     Ok(())
-}
-
-fn log_output(image: &DynamicImage, path: &str) {
-    println!(
-        "Output image {:?} (width: {}, height: {})",
-        path,
-        image.width(),
-        image.height()
-    );
 }
 
 /// Run an image processing pipeline on a stack with the given initial contents.
@@ -137,4 +78,57 @@ pub fn run_pipeline(
     }
 
     Ok(stack.contents())
+}
+
+
+fn load_inputs(input_patterns: &[String], verbose: bool) -> Result<Vec<DynamicImage>> {
+    let mut inputs = Vec::new();
+
+    let paths = input_patterns
+        .iter()
+        .map(|pattern| glob(pattern).context(GlobPatternError { pattern }))
+        .collect::<Result<Vec<_>>>()?
+        .into_iter()
+        .flatten()
+        .map(|path| path.context(GlobIterationError))
+        .collect::<Result<Vec<_>>>()?;
+
+    for path in paths {
+        let image = open(&path).context(ImageOpenError { path: &path })?;
+        if verbose {
+            println!(
+                "Loaded input {:?} (width: {}, height: {})",
+                path,
+                image.width(),
+                image.height()
+            );
+        }
+        inputs.push(image);
+    }
+
+    Ok(inputs)
+}
+
+fn save_images(spec: &OutputSpec, images: &[DynamicImage], verbose: bool) -> Result<()> {
+    for (index, image) in images.iter().enumerate() {
+        match spec.nth_output_path(index) {
+            Some(path) => {
+                if verbose {
+                    log_output(&image, &path);
+                }
+                image.save(&path).context(ImageSaveError { path: &path })?;
+            },
+            None => break
+        }
+    }
+    Ok(())
+}
+
+fn log_output(image: &DynamicImage, path: &str) {
+    println!(
+        "Output image {:?} (width: {}, height: {})",
+        path,
+        image.width(),
+        image.height()
+    );
 }

@@ -54,6 +54,10 @@ pub enum ImageCliError {
     #[snafu(display("Error iterating glob results. Path: {:?}. Error: {}", source.path(), source.error()))]
     GlobIterationError { source: glob::GlobError },
 
+    /// A user-provided output path or pattern is invalid.
+    #[snafu(display("Invalid output path or pattern: {}", error))]
+    OutputPathError { error: String },
+
     /// An error from any other issue with user-provided arguments.
     #[snafu(display("{}", context))]
     InvalidArgError { context: String },

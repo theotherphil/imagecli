@@ -15,6 +15,7 @@
 
 use image::{open, DynamicImage, GenericImageView};
 use snafu::ResultExt;
+use std::path::PathBuf;
 
 pub mod documentation;
 pub mod error;
@@ -78,19 +79,23 @@ pub fn run_pipeline(
     Ok(stack.contents())
 }
 
-fn load_inputs(input_patterns: &[String], verbose: bool) -> Result<Vec<DynamicImage>> {
-    let mut inputs = Vec::new();
-
-    let paths = input_patterns
+/// Finds the set of input paths matching the provided glob patterns.
+pub fn input_paths(input_patterns: &[String]) -> Result<Vec<PathBuf>> {
+    input_patterns
         .iter()
         .map(|pattern| glob(pattern).context(GlobPatternError { pattern }))
         .collect::<Result<Vec<_>>>()?
         .into_iter()
         .flatten()
         .map(|path| path.context(GlobIterationError))
-        .collect::<Result<Vec<_>>>()?;
+        .collect::<Result<Vec<_>>>()
+}
 
-    for path in paths {
+/// Load all images matching the given globs.
+pub fn load_inputs(input_patterns: &[String], verbose: bool) -> Result<Vec<DynamicImage>> {
+    let mut inputs = Vec::new();
+
+    for path in input_paths(input_patterns)? {
         let image = open(&path).context(ImageOpenError { path: &path })?;
         if verbose {
             println!(
@@ -106,7 +111,8 @@ fn load_inputs(input_patterns: &[String], verbose: bool) -> Result<Vec<DynamicIm
     Ok(inputs)
 }
 
-fn save_images(spec: &OutputSpec, images: &[DynamicImage], verbose: bool) -> Result<()> {
+/// Save images according to an `OutputSpec`.
+pub fn save_images(spec: &OutputSpec, images: &[DynamicImage], verbose: bool) -> Result<()> {
     for (index, image) in images.iter().enumerate() {
         match spec.nth_output_path(index) {
             Some(path) => {

@@ -253,6 +253,38 @@ $EXAMPLE(
   pipeline: DUP 5 > [id, rotate 10, rotate 20, rotate 30, rotate 40, rotate 50] > MAP hcat 3 > vcat
 )$
 
+## Glob inputs
+
+Glob patterns can be used to specify the set of input files to read, for example to match all files in a
+directory with a png extension.
+
+All of the matching images are inserted into [the image stack](#the-image-stack), and then the
+supplied pipeline is run. In the common case that you want to perform an operation on each input
+image you can use the [map](#option-3---map) operation.
+
+$EXAMPLE(
+  num_inputs: 2
+  inputs: robin*.png
+  num_outputs: 2
+  pipeline: MAP (vflip > rotate 20)
+)$
+
+## Variable number of output images
+
+Instead of providing a list of output image paths you can provide a single output path containing `{n}`.
+In this case the pipeline will be run and then every image on the stack will be saved, replacing `{n}`
+with the distance of this image from the top of the stack. For example, if you specify an output path
+of `some_path_{n}.png` then the first image on the stack will be saved to `some_path_0.png`, the second
+to `some_path_1.png`, and so on. You can optionally specify a minimum number of digits to use
+for the image count. For example, an output path of `some_path_{n:3}.png` results in the first image
+in the stack being saved to `some_path_000.png`.
+
+$EXAMPLE(
+  variable_outputs: true
+  pipeline: tile 100 150
+  num_outputs: 4
+)$
+
 ## User-defined functions
 
 We provide limited support for user-defined functions via the `func`, `func2` and `func3`

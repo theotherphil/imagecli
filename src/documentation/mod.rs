@@ -76,6 +76,12 @@ fn render_readme(template: &str, verbose: bool) -> Result<String> {
     }
 
     for example in &examples {
+        if verbose {
+            println!(
+                "Running example\n\t'{}'",
+                example.command_line_for_documentation()
+            );
+        }
         example.run(verbose)?;
     }
 

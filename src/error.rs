@@ -50,7 +50,7 @@ pub enum ImageCliError {
         source: glob::PatternError,
     },
 
-    /// An when iterating files matching a glob.
+    /// An error when iterating files matching a glob.
     #[snafu(display("Error iterating glob results. Path: {:?}. Error: {}", source.path(), source.error()))]
     GlobIterationError { source: glob::GlobError },
 

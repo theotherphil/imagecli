@@ -15,7 +15,7 @@ pub enum OutputSpec {
 }
 
 lazy_static! {
-    static ref OUTPUT_PATTERN: Regex = Regex::new(r"[{{]n(:\d+)?[}}]").unwrap();
+    static ref OUTPUT_PATTERN: Regex = Regex::new(r"[{{]n(:(\d+))?[}}]").unwrap();
 }
 
 fn arg_error<I: Into<String>>(msg: I) -> ImageCliError {
@@ -72,20 +72,18 @@ fn parse_pattern(path: &str) -> Result<Option<(String, Option<usize>)>> {
         0 => Ok(None),
         1 => {
             let pat = &captures[0];
-            match pat.get(1) {
-                Some(width) => {
-                    let width = &width.as_str()[1..];
-                    let width = width.parse::<usize>();
-                    match width {
-                        Ok(w) => Ok(Some((path.into(), Some(w)))),
-                        Err(e) => Err(arg_error(format!(
-                            "Unable to parse '{:?}' as an output pattern: {:?}",
-                            pat, e
-                        ))),
-                    }
-                }
-                None => Ok(Some((path.into(), None))),
-            }
+            let width = pat
+                .get(2)
+                .map(|w| w.as_str().parse::<usize>())
+                .transpose()
+                .map_err(|err| {
+                    arg_error(format!(
+                        "Unable to parse '{:?}' as an output pattern: {:?}",
+                        pat, err
+                    ))
+                })?;
+
+            Ok(Some((path.into(), width)))
         }
         _ => Err(arg_error(
             "'{n:WIDTH}' or '{n}' can only appear once in an output path",

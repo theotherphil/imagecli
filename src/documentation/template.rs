@@ -66,6 +66,7 @@ pub fn parse_example<'a, I: Iterator<Item = &'a str>>(lines: &mut I) -> Example 
                     Some(value.split_whitespace().map(|s| s.to_string()).collect())
             }
             "output_file_extension" => example.output_file_extension = Some(value.into()),
+            "variable_outputs" => example.variable_outputs = value.parse::<bool>().unwrap(),
             "style" => {
                 example.style = match value {
                     "longform" => Style::LongForm,
@@ -145,6 +146,7 @@ mod tests {
                 pipeline: "gray > rotate 45".into(),
                 override_input_names: Some(vec!["foo".into(), "bar".into(), "baz".into()]),
                 output_file_extension: Some("jpg".into()),
+                variable_outputs: false,
                 style: Style::LongForm
             }
         );

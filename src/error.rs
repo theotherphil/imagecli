@@ -42,6 +42,25 @@ pub enum ImageCliError {
         remaining)
     )]
     PipelineParseError { consumed: String, remaining: String },
+
+    /// An issue with a user-provided glob pattern.
+    #[snafu(display("Invalid glob pattern '{}'. {}", pattern, source))]
+    GlobPatternError {
+        pattern: String,
+        source: glob::PatternError,
+    },
+
+    /// An error when iterating files matching a glob.
+    #[snafu(display("Error iterating glob results. Path: {:?}. Error: {}", source.path(), source.error()))]
+    GlobIterationError { source: glob::GlobError },
+
+    /// A user-provided output path or pattern is invalid.
+    #[snafu(display("Invalid output path or pattern: {}", error))]
+    OutputPathError { error: String },
+
+    /// An error from any other issue with user-provided arguments.
+    #[snafu(display("{}", context))]
+    InvalidArgError { context: String },
 }
 
 impl From<std::fmt::Error> for ImageCliError {

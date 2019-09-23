@@ -1,5 +1,4 @@
 use imagecli::{documentation::generate_readme, process};
-use std::path::PathBuf;
 use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
@@ -8,13 +7,13 @@ struct Opt {
     #[structopt(short, long)]
     verbose: bool,
 
-    /// Input files.
-    #[structopt(short, long, parse(from_os_str))]
-    input: Vec<PathBuf>,
+    /// Input files or glob patterns.
+    #[structopt(short, long)]
+    input: Vec<String>,
 
     /// Output files.
-    #[structopt(short, long, parse(from_os_str))]
-    output: Vec<PathBuf>,
+    #[structopt(short, long)]
+    output: Vec<String>,
 
     /// Image processing pipeline to apply.
     #[structopt(short, long)]

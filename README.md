@@ -10,6 +10,8 @@ A command line image processing tool, built on top of [image] and [imageproc].
  - [Basic usage](#basic-usage)
  - [Multi-stage pipelines](#multi-stage-pipelines)
  - [The image stack](#the-image-stack)
+ - [Glob inputs](#glob-inputs)
+ - [Variable number of output images](#variable-number-of-output-images)
  - [User-defined functions](#user-defined-functions)
  - [Operations](#operations)
 
@@ -346,6 +348,35 @@ multiple inputs.
 
 <pre>imagecli -i robin.png -o ex1_0.png -p 'DUP 5 > [id, rotate 10, rotate 20, rotate 30, rotate 40, rotate 50] > MAP hcat 3 > vcat'</pre>
 <img src='images/option-3---map/ex1_0.png'/>
+
+## Glob inputs
+
+Glob patterns can be used to specify the set of input files to read, for example to match all files in a
+directory with a png extension.
+
+All of the matching images are inserted into [the image stack](#the-image-stack), and then the
+supplied pipeline is run. In the common case that you want to perform an operation on each input
+image you can use the [map](#option-3---map) operation.
+
+<pre>imagecli -i robin*.png -o ex0_0.png ex0_1.png -p 'MAP (vflip > rotate 20)'</pre>
+<img src='images/glob-inputs/ex0_0.png'/>
+<img src='images/glob-inputs/ex0_1.png'/>
+
+## Variable number of output images
+
+Instead of providing a list of output image paths you can provide a single output path containing `{n}`.
+In this case the pipeline will be run and then every image on the stack will be saved, replacing `{n}`
+with the distance of this image from the top of the stack. For example, if you specify an output path
+of `some_path_{n}.png` then the first image on the stack will be saved to `some_path_0.png`, the second
+to `some_path_1.png`, and so on. You can optionally specify a minimum number of digits to use
+for the image count. For example, an output path of `some_path_{n:3}.png` results in the first image
+in the stack being saved to `some_path_000.png`.
+
+<pre>imagecli -i robin.png -o ex0_{n}.png -p 'tile 100 150'</pre>
+<img src='images/variable-number-of-output-images/ex0_0.png'/>
+<img src='images/variable-number-of-output-images/ex0_1.png'/>
+<img src='images/variable-number-of-output-images/ex0_2.png'/>
+<img src='images/variable-number-of-output-images/ex0_3.png'/>
 
 ## User-defined functions
 

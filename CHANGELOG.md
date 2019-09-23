@@ -11,6 +11,7 @@
   - Pad
   - Tile
   - New
+* Added support for glob inputs and a variable number of output images.
 
 # 0.1.0 (2019-09-15)
 

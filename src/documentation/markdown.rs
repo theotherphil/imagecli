@@ -8,7 +8,7 @@ pub fn markdown_internal_link(section: &str) -> String {
 }
 
 /// Name of the anchor github generates for a markdown section.
-fn markdown_anchor_name(section: &str) -> String {
+pub fn markdown_anchor_name(section: &str) -> String {
     section
         .trim()
         .replace(",", "")

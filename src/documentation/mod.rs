@@ -5,8 +5,10 @@ pub mod stack_diagram;
 pub mod template;
 
 use crate::error::{IoError, Result};
-use crate::image_ops::documentation;
-use markdown::{find_headers, header, markdown_internal_link, markdown_table, Header};
+use crate::image_ops::{documentation, Alias, Documentation};
+use markdown::{
+    find_headers, header, markdown_anchor_name, markdown_internal_link, markdown_table, Header,
+};
 use snafu::ResultExt;
 use std::fmt::Write;
 use template::{parse_diagram, parse_example};
@@ -88,17 +90,20 @@ fn render_readme(template: &str, verbose: bool) -> Result<String> {
     let mut operations = String::new();
 
     // Summary table
+    let mut summaries = Vec::new();
+    for doc in documentation().iter() {
+        summaries.push(summary_from_documentation(doc));
+        for alias in &doc.aliases {
+            summaries.push(summary_from_alias(alias, doc.operation));
+        }
+    }
+    summaries.sort_by_key(|s| s.name);
     let operations_table = markdown_table(
         &["Operation", "Usage", "Description"],
-        documentation().iter(),
-        |doc| {
-            vec![
-                markdown_internal_link(&doc.operation),
-                format!("`{}`", doc.usage.replace("|", "\\|")),
-                doc.explanation.split('\n').nth(0).unwrap().into(),
-            ]
-        },
+        summaries.iter(),
+        row_from_summary,
     );
+
     writeln!(operations, "{}", operations_table)?;
 
     // Detailed per-op documentation
@@ -106,6 +111,11 @@ fn render_readme(template: &str, verbose: bool) -> Result<String> {
         writeln!(operations, "\n### {}\n", docs.operation)?;
         writeln!(operations, "Usage: `{}`\n", docs.usage)?;
         writeln!(operations, "{}", docs.explanation)?;
+        for alias in &docs.aliases {
+            writeln!(operations, "\n##### Alias: {}", alias.name)?;
+            writeln!(operations, "\nUsage: `{}`\n", alias.usage)?;
+            writeln!(operations, "{}", alias.description)?;
+        }
         if !docs.examples.is_empty() {
             writeln!(operations, "\n#### Examples\n")?;
             for (count, example) in docs.examples.iter().enumerate() {
@@ -142,4 +152,42 @@ fn render_readme(template: &str, verbose: bool) -> Result<String> {
     let result = result.replace("$TABLE_OF_CONTENTS", &toc);
 
     Ok(result)
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct Summary {
+    name: &'static str,
+    usage: &'static str,
+    explanation: String,
+    alias_for: Option<&'static str>,
+}
+
+fn summary_from_documentation(doc: &Documentation) -> Summary {
+    Summary {
+        name: doc.operation,
+        usage: doc.usage,
+        explanation: doc.explanation.into(),
+        alias_for: None,
+    }
+}
+
+fn summary_from_alias(alias: &Alias, operation: &'static str) -> Summary {
+    Summary {
+        name: alias.name,
+        usage: alias.usage,
+        explanation: format!("See {}.", markdown_internal_link(operation)),
+        alias_for: Some(operation),
+    }
+}
+
+fn row_from_summary(summary: &Summary) -> Vec<String> {
+    vec![
+        format!(
+            "[{}](#{})",
+            summary.name,
+            markdown_anchor_name(summary.alias_for.unwrap_or(&summary.name))
+        ),
+        format!("`{}`", summary.usage.replace("|", "\\|")),
+        summary.explanation.split('\n').nth(0).unwrap().into(),
+    ]
 }

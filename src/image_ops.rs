@@ -86,7 +86,6 @@ fn parse_image_op(input: &str) -> IResult<&str, Box<dyn ImageOp>> {
             Gray::parse,
             Green::parse,
             Grid::parse,
-            map_box!(op_one_opt("hcat", int::<u32>, |x| Grid(x.unwrap_or(2), 1))),
             HFlip::parse,
             Id::parse,
             Map::parse,
@@ -108,7 +107,6 @@ fn parse_image_op(input: &str) -> IResult<&str, Box<dyn ImageOp>> {
             Threshold::parse,
             Tile::parse,
             Translate::parse,
-            map_box!(op_one_opt("vcat", int::<u32>, |x| Grid(1, x.unwrap_or(2)))),
             VFlip::parse,
         )),
     ))(input)
@@ -154,6 +152,17 @@ pub fn documentation() -> Vec<Documentation> {
     ]
 }
 
+/// An alias is a shorthand for an operation, handled during parsing.
+/// For example, `SWAP` for `ROT 2` and `hcat` for `grid 2 1`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Alias {
+    /// Usage string for the operation - see README.md for the conventions used.
+    pub usage: &'static str,
+    /// A human-readable description of what this is an alias for.
+    /// For example: "`SWAP` is an alias for `ROT 2`.`.
+    pub description: &'static str,
+}
+
 /// Documentation for an image operation.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Documentation {
@@ -163,11 +172,22 @@ pub struct Documentation {
     pub usage: &'static str,
     /// A human-readable explanation of what the operation does.
     pub explanation: &'static str,
+    /// Any aliases for this operation.
+    ///
+    /// There is no built-in parsing support for aliases - these must be handled
+    /// in the `parse` function of the `ImageOp` itself. See `Grid` for an example.
+    pub aliases: Vec<Alias>,
     /// Example pipelines using this operation. These are run and rendered
     /// as part of generating README.md.
     pub examples: Vec<Example>,
 }
 
+/// Simple macro to reduce the boilerplate required to define the documentation and parser
+/// for an operation.
+///
+/// This macro does not support aliases - if your operation has aliases then
+/// you'll need to write the implementations directly. See `Grid` for an example of an operation
+/// with aliases.
 macro_rules! impl_parse {
     ($name:ident, $usage:expr, $explanation:expr, $parse:expr, examples: $( $ex:expr ),*) => {
         impl $name {
@@ -177,6 +197,7 @@ macro_rules! impl_parse {
                     operation: stringify!($name),
                     usage: $usage,
                     explanation: $explanation,
+                    aliases: Vec::new(),
                     examples,
                 }
             }
@@ -955,23 +976,49 @@ fn grid(images: &[DynamicImage], cols: u32, rows: u32) -> DynamicImage {
     ImageRgba8(out)
 }
 
-impl_parse!(
-    Grid, // TODO: roll hcat and vcat aliases into the Grid parser
-    "grid <columns> <rows>",
-    "Arranges a series of images into a grid.
+impl Grid {
+    fn documentation() -> Documentation {
+        Documentation {
+            operation: "Grid",
+            usage: "grid <columns> <rows>",
+            explanation: "Arranges a series of images into a grid.",
+            aliases: vec![
+                Alias {
+                    usage: "hcat [columns]",
+                    description: "`hcat` is equivalent to `Grid 2 1`. `hcat n` is equivalent to \
+                                  `Grid n 1`",
+                },
+                Alias {
+                    usage: "vcat [rows]",
+                    description: "`vcat` is equivalent to `Grid 1 2`. `vcat n` is equivalent to \
+                                  `Grid 1 n`",
+                },
+            ],
+            examples: vec![
+                Example::new(
+                    1,
+                    1,
+                    "DUP 3 > [gaussian 1.0, gaussian 3.0, gaussian 5.0,\
+                     gaussian 7.0] > grid 2 2",
+                ),
+                Example::new(
+                    1,
+                    1,
+                    "scale 0.5 > DUP 5 > [scale 1.0, scale 0.9, scale 0.8, \
+                     scale 0.7, scale 0.6, scale 0.5] > grid 3 2",
+                ),
+            ],
+        }
+    }
 
-Aliases: `hcat` is equivalent to `Grid 2 1`, `hcat n` \
-is equivalent to `Grid n 1`, `vcat` is equivalent to `Grid 1 2`, `vcat n` is equivalent \
-to `Grid 1 n`.",
-    op_two("grid", int::<u32>, int::<u32>, Grid),
-    examples:
-        Example::new(1, 1, "DUP 3 > [gaussian 1.0, gaussian 3.0, gaussian 5.0,\
-            gaussian 7.0] > grid 2 2"
-        ),
-        Example::new(1, 1, "scale 0.5 > DUP 5 > [scale 1.0, scale 0.9, scale 0.8, \
-            scale 0.7, scale 0.6, scale 0.5] > grid 3 2"
-        )
-);
+    fn parse<'a>(input: &'a str) -> IResult<&'a str, Box<dyn ImageOp>> {
+        map_box!(alt((
+            op_two("grid", int::<u32>, int::<u32>, Grid),
+            op_one_opt("hcat", int::<u32>, |x| Grid(x.unwrap_or(2), 1)),
+            op_one_opt("vcat", int::<u32>, |x| Grid(1, x.unwrap_or(2)))
+        )))(input)
+    }
+}
 
 //-----------------------------------------------------------------------------
 // HFlip

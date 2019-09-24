@@ -431,8 +431,8 @@ must be an integer, or must be strictly positive).
 
 Operation|Usage|Description
 ---|---|---
-[Array](#array)|`[IMAGE_OP, .. ]`|Applies a series of image operations to the stack.
 [AdaptiveThreshold](#adaptivethreshold)|`athresh <block_radius>`|Binarises an image using adaptive thresholding.
+[Array](#array)|`[IMAGE_OP, .. ]`|Applies a series of image operations to the stack.
 [Blue](#blue)|`blue`|Extracts the blue channel from an image as a grayscale image.
 [Carve](#carve)|`carve <width_ratio>`|Shrinks an image's width using seam carving.
 [Circle](#circle)|`circle <filltype> <cx> <cy> <radius> '('COLOR')'`|Draws a circle on an image.
@@ -446,6 +446,7 @@ Operation|Usage|Description
 [Gray](#gray)|`gray`|Converts an image to grayscale.
 [Green](#green)|`green`|Extracts the green channel from an image as a grayscale image.
 [Grid](#grid)|`grid <columns> <rows>`|Arranges a series of images into a grid.
+[HCat](#grid)|`hcat [columns]`|See [Grid](#grid).
 [HFlip](#hflip)|`hflip`|Flips an image horizontally.
 [Id](#id)|`id`|Applies the identity function, i.e. does nothing.
 [Map](#map)|`MAP IMAGE_OP`|Maps a single operation over the stack.
@@ -464,6 +465,7 @@ Operation|Usage|Description
 [Threshold](#threshold)|`thresh`|Binarises an image using a user-defined threshold.
 [Tile](#tile)|`tile <tile_width> <tile_height>`|Splits an image into tiles.
 [Translate](#translate)|`translate <tx> <ty>`|Translates an image by `(tx, ty)`.
+[VCat](#grid)|`vcat [rows]`|See [Grid](#grid).
 [VFlip](#vflip)|`vflip`|Flips an image vertically.
 
 
@@ -644,7 +646,17 @@ Usage: `grid <columns> <rows>`
 
 Arranges a series of images into a grid.
 
-Aliases: `hcat` is equivalent to `Grid 2 1`, `hcat n` is equivalent to `Grid n 1`, `vcat` is equivalent to `Grid 1 2`, `vcat n` is equivalent to `Grid 1 n`.
+##### Alias: HCat
+
+Usage: `hcat [columns]`
+
+`hcat` is equivalent to `grid 2 1`. `hcat n` is equivalent to `grid n 1`.
+
+##### Alias: VCat
+
+Usage: `vcat [rows]`
+
+`vcat` is equivalent to `grid 1 2`. `vcat n` is equivalent to `grid 1 n`.
 
 #### Examples
 

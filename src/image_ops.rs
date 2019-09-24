@@ -156,6 +156,8 @@ pub fn documentation() -> Vec<Documentation> {
 /// For example, `SWAP` for `ROT 2` and `hcat` for `grid 2 1`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Alias {
+    /// Name used for this alias in the generated table of image operation summaries.
+    pub name: &'static str,
     /// Usage string for the operation - see README.md for the conventions used.
     pub usage: &'static str,
     /// A human-readable description of what this is an alias for.
@@ -984,14 +986,16 @@ impl Grid {
             explanation: "Arranges a series of images into a grid.",
             aliases: vec![
                 Alias {
+                    name: "HCat",
                     usage: "hcat [columns]",
-                    description: "`hcat` is equivalent to `Grid 2 1`. `hcat n` is equivalent to \
-                                  `Grid n 1`",
+                    description: "`hcat` is equivalent to `grid 2 1`. `hcat n` is equivalent to \
+                                  `grid n 1`.",
                 },
                 Alias {
+                    name: "VCat",
                     usage: "vcat [rows]",
-                    description: "`vcat` is equivalent to `Grid 1 2`. `vcat n` is equivalent to \
-                                  `Grid 1 n`",
+                    description: "`vcat` is equivalent to `grid 1 2`. `vcat n` is equivalent to \
+                                  `grid 1 n`.",
                 },
             ],
             examples: vec![

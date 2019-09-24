@@ -91,9 +91,9 @@ fn parse_image_op(input: &str) -> IResult<&str, Box<dyn ImageOp>> {
             Map::parse,
             Median::parse,
             New::parse,
+            OtsuThreshold::parse,
         )),
         alt((
-            OtsuThreshold::parse,
             Overlay::parse,
             Pad::parse,
             Red::parse,
@@ -103,7 +103,6 @@ fn parse_image_op(input: &str) -> IResult<&str, Box<dyn ImageOp>> {
             Scale::parse,
             Sequence::parse,
             Sobel::parse,
-            map_box!(op_zero("SWAP", Rot(2))),
             Threshold::parse,
             Tile::parse,
             Translate::parse,
@@ -1538,14 +1537,30 @@ impl ImageOp for Rot {
     }
 }
 
-impl_parse!(
-    Rot,
-    "ROT [count]",
-    "Rotates the top `count` elements of the stack by 1.
+impl Rot {
+    fn documentation() -> Documentation {
+        Documentation {
+            operation: "Rot",
+            usage: "ROT [count]",
+            explanation: "Rotates the top `count` elements of the stack by 1.
 
-`count` defaults to 3 if not provided. Aliases: `SWAP` is equivalent to `ROT 2`.",
-    op_one_opt("ROT", int::<usize>, |x| Rot(x.unwrap_or(3)))
-);
+        `count` defaults to 3 if not provided.",
+            aliases: vec![Alias {
+                name: "Swap",
+                usage: "SWAP",
+                description: "`SWAP` is equivalent to `ROT 2`.",
+            }],
+            examples: Vec::new(),
+        }
+    }
+
+    fn parse<'a>(input: &'a str) -> IResult<&'a str, Box<dyn ImageOp>> {
+        map_box!(alt((
+            op_one_opt("ROT", int::<usize>, |x| Rot(x.unwrap_or(3))),
+            op_zero("SWAP", Rot(2))
+        )))(input)
+    }
+}
 
 //-----------------------------------------------------------------------------
 // Rotate

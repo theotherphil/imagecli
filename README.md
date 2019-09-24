@@ -462,6 +462,7 @@ Operation|Usage|Description
 [Scale](#scale)|`scale <ratio>`|Scales image width and height by `ratio`.
 [Sequence](#sequence)|`(IMAGE_OP > .. )`|Applies a sequence of image operations in order.
 [Sobel](#sobel)|`sobel`|Computes image gradients using the Sobel filter.
+[Swap](#rot)|`SWAP`|See [Rot](#rot).
 [Threshold](#threshold)|`thresh`|Binarises an image using a user-defined threshold.
 [Tile](#tile)|`tile <tile_width> <tile_height>`|Splits an image into tiles.
 [Translate](#translate)|`translate <tx> <ty>`|Translates an image by `(tx, ty)`.
@@ -795,7 +796,13 @@ Usage: `ROT [count]`
 
 Rotates the top `count` elements of the stack by 1.
 
-`count` defaults to 3 if not provided. Aliases: `SWAP` is equivalent to `ROT 2`.
+        `count` defaults to 3 if not provided.
+
+##### Alias: Swap
+
+Usage: `SWAP`
+
+`SWAP` is equivalent to `ROT 2`.
 
 ### Rotate
 

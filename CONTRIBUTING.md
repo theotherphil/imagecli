@@ -10,7 +10,7 @@ generating documentation we run all of the examples, so the best current option
 for checking for diffs is to run the following command line.
 
 ```
-cargo run --release -- --generate-readme
+cargo run --release -- --generate-guide
 ```
 
 ### Adding new image operations
@@ -22,9 +22,9 @@ To add a new image operation, you need to:
   macro for this unless you have good reason not to.
 * Add the new op to the list in `image_ops::parse_image_op`.
 * Add the new op to `image_ops::documentation`.
-* Regenerate README.md using the command line above.
+* Regenerate GUIDE.md using the command line above.
 
-### Updating the README
+### Updating the GUIDE
 
-Do not edit README.md directly - instead update README_template.txt and
+Do not edit GUIDE.md directly - instead update GUIDE_template.txt and
 run the command line above.

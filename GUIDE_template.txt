@@ -1,25 +1,6 @@
 # imagecli
 
-[![crates.io](https://img.shields.io/crates/v/imagecli.svg)](https://crates.io/crates/imagecli)
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/theotherphil/imagecli/blob/master/LICENSE.md)
-
-A command line image processing tool, built on top of [image] and [imageproc].
-
 $TABLE_OF_CONTENTS
-
-## Installation
-
-Either install using cargo, or clone this repo and build it locally.
-
-```
-cargo install imagecli
-```
-
-There are currently no pre-built binaries available.
-
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Basic usage
 
@@ -340,6 +321,3 @@ Follow the links for a more detailed description, including any restrictions on 
 must be an integer, or must be strictly positive).
 
 $OPERATIONS
-
-[image]: https://github.com/image-rs/image
-[imageproc]: https://github.com/image-rs/imageproc

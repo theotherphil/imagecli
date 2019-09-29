@@ -1,4 +1,4 @@
-use imagecli::{documentation::generate_readme, process};
+use imagecli::{documentation::generate_guide, process};
 use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
@@ -19,16 +19,16 @@ struct Opt {
     #[structopt(short, long)]
     pipeline: Option<String>,
 
-    /// Ignore all the other flags and generate a README instead.
+    /// Ignore all the other flags and regenerate a user guide instead.
     #[structopt(long)]
-    generate_readme: bool,
+    generate_guide: bool,
 }
 
 fn main() {
     let opt = Opt::from_args();
 
-    let result = if opt.generate_readme {
-        generate_readme(opt.verbose)
+    let result = if opt.generate_guide {
+        generate_guide(opt.verbose)
     } else {
         process(&opt.input, &opt.output, opt.pipeline, opt.verbose)
     };

@@ -1,4 +1,4 @@
-//! Functions for handling the very basic templating used in README_template.txt
+//! Functions for handling the very basic templating used in GUIDE_template.txt
 //!
 //! The following forms are supported.
 //!

@@ -17,8 +17,8 @@ There are currently no pre-built binaries available.
 
 ## User guide
 
-[Current master](https://github.com/theotherphil/imagecli/GUIDE.md)
-[Version 0.1.0](https://github.com/theotherphil/imagecli/tree/v0.1.0/README.md)
+- [Current master](https://github.com/theotherphil/imagecli/GUIDE.md)
+- [Version 0.1.0](https://github.com/theotherphil/imagecli/tree/v0.1.0/README.md)
 
 ## Contributing
 

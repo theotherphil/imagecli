@@ -22,16 +22,16 @@ fn dir_name(section: &str) -> String {
         .to_lowercase()
 }
 
-/// Reads README_template.md and writes README.md.
-pub fn generate_readme(verbose: bool) -> Result<()> {
-    let read_path = "README_template.txt";
-    let write_path = "README.md";
+/// Reads GUIDE_template.md and writes GUIDE.md.
+pub fn generate_guide(verbose: bool) -> Result<()> {
+    let read_path = "GUIDE_template.txt";
+    let write_path = "GUIDE.md";
 
     let template = std::fs::read_to_string(read_path).context(IoError {
         context: format!("Unable to read file '{}", read_path),
     })?;
 
-    let rendered = render_readme(&template, verbose)?;
+    let rendered = render_guide(&template, verbose)?;
 
     std::fs::write(write_path, rendered).context(IoError {
         context: format!("Unable to write to file '{}'", write_path),
@@ -40,7 +40,7 @@ pub fn generate_readme(verbose: bool) -> Result<()> {
     Ok(())
 }
 
-fn render_readme(template: &str, verbose: bool) -> Result<String> {
+fn render_guide(template: &str, verbose: bool) -> Result<String> {
     let mut result = String::new();
     let mut examples = Vec::new();
     let mut current_section = Header {

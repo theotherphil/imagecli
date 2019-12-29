@@ -91,7 +91,8 @@ pub fn input_paths(input_patterns: &[String]) -> Result<Vec<PathBuf>> {
 /// Finds the set of paths matching the provided glob pattern.
 pub fn paths_matching_pattern(pattern: &str) -> Result<Vec<PathBuf>> {
     let glob = glob(pattern).context(GlobPatternError { pattern })?;
-    glob.map(|p| p.context(GlobIterationError)).collect::<Result<Vec<_>>>()
+    glob.map(|p| p.context(GlobIterationError))
+        .collect::<Result<Vec<_>>>()
 }
 
 /// Load all images matching the given globs.

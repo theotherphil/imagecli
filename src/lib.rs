@@ -15,11 +15,16 @@
 
 use image::{open, DynamicImage, GenericImageView};
 use snafu::ResultExt;
-use std::path::PathBuf;
+use std::{
+    io::{Error, ErrorKind},
+    path::PathBuf,
+};
 
 pub mod documentation;
 pub mod error;
-use crate::error::{GlobIterationError, GlobPatternError, ImageOpenError, ImageSaveError, Result};
+use crate::error::{
+    GlobIterationError, GlobPatternError, ImageCliError, ImageOpenError, ImageSaveError, Result,
+};
 mod example;
 mod expr;
 use glob::glob;
@@ -91,8 +96,24 @@ pub fn input_paths(input_patterns: &[String]) -> Result<Vec<PathBuf>> {
 /// Finds the set of paths matching the provided glob pattern.
 pub fn paths_matching_pattern(pattern: &str) -> Result<Vec<PathBuf>> {
     let glob = glob(pattern).context(GlobPatternError { pattern })?;
-    glob.map(|p| p.context(GlobIterationError))
-        .collect::<Result<Vec<_>>>()
+    let paths = glob
+        .map(|p| p.context(GlobIterationError))
+        .collect::<Result<Vec<_>>>();
+
+    // A bit of a hack for https://github.com/theotherphil/imagecli/issues/42
+    if let Ok(p) = &paths {
+        if p.len() == 0 && !pattern.contains("*") && !pattern.contains("?") {
+            return Err(ImageCliError::IoError {
+                context: "Input error".into(),
+                source: Error::new(
+                    ErrorKind::NotFound,
+                    format!("No file found matching pattern '{}'", pattern),
+                ),
+            });
+        }
+    }
+
+    paths
 }
 
 /// Load all images matching the given globs.

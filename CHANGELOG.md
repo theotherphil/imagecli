@@ -1,8 +1,8 @@
 
 # Unreleased
 
-* Minor improvements to README.
-* Improved error reporting.
+# 0.2.0 (2019-12-29)
+
 * New operations:
   - Crop
   - Overlay
@@ -11,9 +11,10 @@
   - Pad
   - Tile
   - New
+* Improved error reporting.
 * Added support for glob inputs and a variable number of output images.
-* Moved user guide into separate file, replaced --generate-readme option
-  with --generate-guide.
+* Moved user guide into a separate file, replaced --generate-readme option
+  with --generate-guide, and made minor improvements to the guide and README.
 
 # 0.1.0 (2019-09-15)
 

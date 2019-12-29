@@ -17,7 +17,7 @@ use image::{open, DynamicImage, GenericImageView};
 use snafu::ResultExt;
 use std::{
     io::{Error, ErrorKind},
-    path::PathBuf
+    path::PathBuf,
 };
 
 pub mod documentation;

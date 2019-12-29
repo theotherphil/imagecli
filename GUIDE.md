@@ -15,7 +15,7 @@ The simplest possible usage loads an image and then saves an identical copy of i
 <pre>imagecli --input robin.png --output ex0_0.png</pre>
 <img src='images/basic-usage/ex0_0.png'/>
 
-To be slightly more useful, we can specify a different format for the output image. (See [image]
+To be slightly more useful, we can specify a different format for the output image. (See [image](https://github.com/image-rs/image)
 for a list of supported formats.)
 
 <pre>imagecli --input robin.png --output ex1_0.jpg</pre>

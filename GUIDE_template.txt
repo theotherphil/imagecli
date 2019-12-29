@@ -10,7 +10,7 @@ $EXAMPLE(
   style: longform
 )$
 
-To be slightly more useful, we can specify a different format for the output image. (See [image]
+To be slightly more useful, we can specify a different format for the output image. (See [image](https://github.com/image-rs/image)
 for a list of supported formats.)
 
 $EXAMPLE(

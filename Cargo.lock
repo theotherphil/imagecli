@@ -256,7 +256,7 @@ dependencies = [
 
 [[package]]
 name = "imagecli"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "glob 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "image 0.22.2 (registry+https://github.com/rust-lang/crates.io-index)",

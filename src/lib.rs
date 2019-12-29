@@ -83,11 +83,15 @@ pub fn run_pipeline(
 pub fn input_paths(input_patterns: &[String]) -> Result<Vec<PathBuf>> {
     input_patterns
         .iter()
-        .map(|pattern| glob(pattern).context(GlobPatternError { pattern }))
-        .collect::<Result<Vec<_>>>()?
-        .into_iter()
-        .flatten()
-        .map(|path| path.context(GlobIterationError))
+        .map(|pattern| paths_matching_pattern(pattern))
+        .collect::<Result<Vec<_>>>()
+        .map(|v| v.into_iter().flatten().collect())
+}
+
+/// Finds the set of paths matching the provided glob pattern.
+pub fn paths_matching_pattern(pattern: &str) -> Result<Vec<PathBuf>> {
+    let glob = glob(pattern).context(GlobPatternError { pattern })?;
+    glob.map(|p| p.context(GlobIterationError))
         .collect::<Result<Vec<_>>>()
 }
 
@@ -95,17 +99,29 @@ pub fn input_paths(input_patterns: &[String]) -> Result<Vec<PathBuf>> {
 pub fn load_inputs(input_patterns: &[String], verbose: bool) -> Result<Vec<DynamicImage>> {
     let mut inputs = Vec::new();
 
-    for path in input_paths(input_patterns)? {
-        let image = open(&path).context(ImageOpenError { path: &path })?;
+    for pattern in input_patterns {
+        let paths = paths_matching_pattern(pattern)?;
         if verbose {
             println!(
-                "Loaded input {:?} (width: {}, height: {})",
-                path,
-                image.width(),
-                image.height()
+                "Found {} path(s) matching input pattern {}: {:?}",
+                paths.len(),
+                pattern,
+                paths,
             );
         }
-        inputs.push(image);
+
+        for path in &paths {
+            let image = open(&path).context(ImageOpenError { path: &path })?;
+            if verbose {
+                println!(
+                    "Loaded input {:?} (width: {}, height: {})",
+                    path,
+                    image.width(),
+                    image.height()
+                );
+            }
+            inputs.push(image);
+        }
     }
 
     Ok(inputs)

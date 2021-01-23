@@ -1471,7 +1471,7 @@ fn resize(image: &DynamicImage, target: &Resize) -> DynamicImage {
         }
         _ => panic!("Must provide at least one of target width or target height"),
     };
-    image.resize(w, h, image::imageops::FilterType::Lanczos3)
+    image.resize_exact(w, h, image::imageops::FilterType::Lanczos3)
 }
 
 // see test_parse_resize for usage

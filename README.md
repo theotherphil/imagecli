@@ -8,6 +8,7 @@ A command line image processing tool, built on top of [image] and [imageproc].
 ## User guide
 
 - [Current master](https://github.com/theotherphil/imagecli/blob/master/GUIDE.md)
+- [Version 0.2.1](https://github.com/theotherphil/imagecli/tree/v0.2.1/GUIDE.md)
 - [Version 0.2.0](https://github.com/theotherphil/imagecli/tree/v0.2.0/GUIDE.md)
 - [Version 0.1.0](https://github.com/theotherphil/imagecli/tree/v0.1.0/README.md)
 

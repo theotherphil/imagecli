@@ -1,6 +1,11 @@
 
 # Unreleased
 
+# 0.2.1 (2021-01-23)
+
+* Bug fix: if the user provides both width and height to `resize` then output an image of size (width, height),
+  rather than always preserving the input image's aspect ratio.
+
 # 0.2.0 (2019-12-29)
 
 * New operations:

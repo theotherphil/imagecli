@@ -1,6 +1,6 @@
 [package]
 name = "imagecli"
-version = "0.2.0"
+version = "0.2.1"
 authors = ["theotherphil"]
 edition = "2018"
 description = "A command line image processing tool."

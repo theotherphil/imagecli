@@ -46,7 +46,7 @@ pub fn parse(pipeline: &str) -> Result<Vec<Box<dyn ImageOp>>> {
     }
     parse_pipeline(pipeline).map(|p| p.1).map_err(|e| {
         let remaining = match e {
-            nom::Err::Error(e) => e.0,
+            nom::Err::Error(e) => e.input,
             _ => unreachable!(),
         };
         let consumed = &pipeline[0..pipeline.len() - remaining.len()];

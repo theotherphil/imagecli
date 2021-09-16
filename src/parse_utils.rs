@@ -2,7 +2,7 @@ use nom::{
     bytes::complete::tag,
     character::complete::{digit1, space0, space1},
     combinator::{map, map_res, opt, recognize},
-    multi::separated_nonempty_list,
+    multi::separated_list0,
     sequence::{delimited, pair, preceded, tuple},
     IResult,
 };
@@ -22,11 +22,11 @@ macro_rules! map_to_boxed_trait {
 pub fn nonempty_sequence<'a, T, F>(
     separator: &'static str,
     element: F,
-) -> impl Fn(&'a str) -> IResult<&'a str, Vec<T>>
+) -> impl FnMut(&'a str) -> IResult<&'a str, Vec<T>>
 where
     F: Fn(&'a str) -> IResult<&'a str, T>,
 {
-    separated_nonempty_list(delimited(space0, tag(separator), space0), element)
+    separated_list0(delimited(space0, tag(separator), space0), element)
 }
 
 /// Parses a integer value.
@@ -37,7 +37,7 @@ pub fn int<T: std::str::FromStr>(input: &str) -> IResult<&str, T> {
 }
 
 /// Matches 'name=<arg>'.
-pub fn named_arg<'a, F, T>(name: &'static str, arg: F) -> impl Fn(&'a str) -> IResult<&'a str, T>
+pub fn named_arg<'a, F, T>(name: &'static str, arg: F) -> impl FnMut(&'a str) -> IResult<&'a str, T>
 where
     F: Fn(&'a str) -> IResult<&'a str, T>,
 {

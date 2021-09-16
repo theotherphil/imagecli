@@ -2,7 +2,7 @@ use nom::{
     bytes::complete::tag,
     character::complete::{digit1, space0, space1},
     combinator::{map, map_res, opt, recognize},
-    multi::separated_list0,
+    multi::separated_list1,
     sequence::{delimited, pair, preceded, tuple},
     IResult,
 };
@@ -26,7 +26,7 @@ pub fn nonempty_sequence<'a, T, F>(
 where
     F: Fn(&'a str) -> IResult<&'a str, T>,
 {
-    separated_list0(delimited(space0, tag(separator), space0), element)
+    separated_list1(delimited(space0, tag(separator), space0), element)
 }
 
 /// Parses a integer value.

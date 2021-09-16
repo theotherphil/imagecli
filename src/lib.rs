@@ -4,15 +4,6 @@
 //! [image]: https://github.com/image-rs/image
 //! [imageproc]: https://github.com/image-rs/imageproc
 
-#![deny(missing_docs)]
-#![cfg_attr(test, feature(test))]
-#![allow(
-    clippy::many_single_char_names,
-    clippy::single_match,
-    clippy::float_cmp,
-    clippy::cast_lossless
-)]
-
 use image::{open, DynamicImage, GenericImageView};
 use snafu::ResultExt;
 use std::{
@@ -29,14 +20,11 @@ mod example;
 mod expr;
 use glob::glob;
 pub mod image_ops;
-use image_ops::parse;
+use image_ops::{parse, ImageOp};
 mod output_spec;
 use output_spec::OutputSpec;
 mod parse_utils;
 mod stack;
-
-#[cfg(test)]
-extern crate test;
 
 /// An image stack. All image operations in this library
 /// operate on an image stack by popping zero or more images
@@ -55,10 +43,11 @@ pub fn process(
     let output_spec = OutputSpec::parse(output_patterns)?;
 
     let pipeline = match pipeline {
-        Some(p) => p.clone(),
-        None => "".into(),
+        Some(p) => parse(&p)?,
+        None => vec![],
     };
-
+    println!("output_spec:{:#?}", output_spec);
+    println!("pipeline:{:#?}", pipeline);
     let outputs = run_pipeline(&pipeline, inputs, verbose)?;
     save_images(&output_spec, &outputs, verbose)?;
 
@@ -67,20 +56,17 @@ pub fn process(
 
 /// Run an image processing pipeline on a stack with the given initial contents.
 pub fn run_pipeline(
-    pipeline: &str,
+    pipeline: &Vec<Box<dyn ImageOp>>,
     inputs: Vec<DynamicImage>,
     verbose: bool,
 ) -> Result<Vec<DynamicImage>> {
     let mut stack = ImageStack::new(inputs);
-    let ops = parse(pipeline)?;
-
-    for op in ops {
+    for op in pipeline {
         if verbose {
             println!("Applying {:?}", op);
         }
         op.apply(&mut stack);
     }
-
     Ok(stack.contents())
 }
 

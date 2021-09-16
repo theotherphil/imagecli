@@ -46,8 +46,6 @@ pub fn process(
         Some(p) => parse(&p)?,
         None => vec![],
     };
-    println!("output_spec:{:#?}", output_spec);
-    println!("pipeline:{:#?}", pipeline);
     let outputs = run_pipeline(&pipeline, inputs, verbose)?;
     save_images(&output_spec, &outputs, verbose)?;
 

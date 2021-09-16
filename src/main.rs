@@ -30,7 +30,6 @@ fn main() {
     let result = if opt.generate_guide {
         generate_guide(opt.verbose)
     } else {
-        println!("input:{:#?}", opt.input);
         process(&opt.input, &opt.output, opt.pipeline, opt.verbose)
     };
 

@@ -43,12 +43,6 @@ pub enum ImageCliError {
     )]
     PipelineParseError { consumed: String, remaining: String },
 
-    /// An error when attempting to parse a pipeline.
-    #[snafu(display("Nom encountered an error while parsing.\n\nError: '{}'", error))]
-    NomParseError {
-        error: nom::Err<nom::error::Error<String>>,
-    },
-
     /// An issue with a user-provided glob pattern.
     #[snafu(display("Invalid glob pattern '{}'. {}", pattern, source))]
     GlobPatternError {

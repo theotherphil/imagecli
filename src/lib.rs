@@ -54,7 +54,7 @@ pub fn process(
 
 /// Run an image processing pipeline on a stack with the given initial contents.
 pub fn run_pipeline(
-    pipeline: &Vec<Box<dyn ImageOp>>,
+    pipeline: &[Box<dyn ImageOp>],
     inputs: Vec<DynamicImage>,
     verbose: bool,
 ) -> Result<Vec<DynamicImage>> {

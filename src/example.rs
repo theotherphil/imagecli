@@ -2,6 +2,7 @@
 
 use crate::{
     error::{ImageOpenError, IoError, Result},
+    image_ops::parse,
     input_paths,
     output_spec::OutputSpec,
     run_pipeline, save_images,
@@ -166,7 +167,8 @@ impl InstantiatedExample {
         }
 
         let output_spec = OutputSpec::parse(&output_paths)?;
-        let outputs = run_pipeline(&self.pipeline, inputs, verbose)?;
+        let pipeline = parse(&self.pipeline)?;
+        let outputs = run_pipeline(&pipeline, inputs, verbose)?;
 
         if !Path::new(&self.output_dir).is_dir() {
             std::fs::create_dir(&self.output_dir).context(IoError {

@@ -9,8 +9,8 @@ use crate::{
 };
 use image::open;
 use snafu::ResultExt;
-use std::fmt::Write;
-use std::path::Path;
+use std::{fmt::Write, sync::Mutex};
+use std::{path::Path, sync::Arc};
 
 /// The default image file names to use as inputs for example pipelines.
 /// Pipelines with n inputs consume the first n images in this array.
@@ -176,7 +176,7 @@ impl InstantiatedExample {
             })?;
         }
 
-        save_images(&output_spec, &outputs, verbose)?;
+        save_images(&output_spec, &outputs, verbose, Arc::new(Mutex::new(0)))?;
 
         Ok(())
     }

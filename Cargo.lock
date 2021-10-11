@@ -413,6 +413,7 @@ dependencies = [
  "lazy_static",
  "nom",
  "pretty_assertions",
+ "rayon",
  "regex",
  "snafu",
  "structopt",

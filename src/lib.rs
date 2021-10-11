@@ -5,10 +5,13 @@
 //! [imageproc]: https://github.com/image-rs/imageproc
 
 use image::{open, DynamicImage, GenericImageView};
+use rayon::{iter::ParallelIterator, slice::ParallelSlice};
 use snafu::ResultExt;
 use std::{
     io::{Error, ErrorKind},
+    ops::AddAssign,
     path::PathBuf,
+    sync::{Arc, Mutex},
 };
 
 pub mod documentation;
@@ -36,20 +39,91 @@ pub type ImageStack = stack::Stack<DynamicImage>;
 pub fn process(
     input_patterns: &[String],
     output_patterns: &[String],
-    pipeline: Option<String>,
+    pipeline_string: Option<String>,
     verbose: bool,
+    parallel: bool,
 ) -> Result<()> {
-    let inputs = load_inputs(input_patterns, verbose)?;
-    let output_spec = OutputSpec::parse(output_patterns)?;
-
-    let pipeline = match pipeline {
-        Some(p) => parse(&p)?,
+    let input_filenames = load_inputs_filename(input_patterns, verbose)?;
+    let pipeline = match &pipeline_string {
+        Some(p) => parse(p)?,
         None => vec![],
     };
-    let outputs = run_pipeline(&pipeline, inputs, verbose)?;
-    save_images(&output_spec, &outputs, verbose)?;
+    let output_spec = OutputSpec::parse(output_patterns)?;
+    if parallel {
+        if let Some(required_images) = total_operation_input_images(&pipeline) {
+            let images_counter = Arc::new(Mutex::new(0));
+            input_filenames
+                .par_chunks_exact(required_images)
+                .map(|input_filename_bucket| {
+                    let pipeline = match &pipeline_string {
+                        Some(p) => parse(p)?,
+                        None => vec![],
+                    };
+                    process_filenames(
+                        &input_filename_bucket,
+                        &output_spec,
+                        &pipeline,
+                        verbose,
+                        images_counter.clone(),
+                    )
+                })
+                .collect::<Result<Vec<()>>>()?;
+            Ok(())
+        } else {
+            eprintln!("Cannot determine if its possible to parallelize the given sequence of operations. Please omit the flag.");
+            Ok(())
+        }
+    } else {
+        process_filenames(
+            &input_filenames,
+            &output_spec,
+            &pipeline,
+            verbose,
+            Arc::new(Mutex::new(0)),
+        )?;
+        Ok(())
+    }
+}
 
+/// Load inputs, run the pipeline, and save the results.
+pub fn process_filenames(
+    input_filenames: &[PathBuf],
+    output_spec: &OutputSpec,
+    pipeline: &[Box<dyn ImageOp>],
+    verbose: bool,
+    images_counter: Arc<Mutex<usize>>,
+) -> Result<()> {
+    let input_images = load_inputs_image(input_filenames, verbose)?;
+    let outputs = run_pipeline(&pipeline, input_images, verbose)?;
+    save_images(&output_spec, &outputs, verbose, images_counter)?;
     Ok(())
+}
+
+/// Determines the total input/output signature of a given sequence of image operations
+pub fn total_operation_input_images(pipeline: &[Box<dyn ImageOp>]) -> Option<usize> {
+    let total = pipeline
+        .iter()
+        .map(|s| {
+            s.signature()
+                .map(|s| std::iter::once(-(s.0 as i32)).chain(std::iter::once(s.1 as i32)))
+        })
+        .collect::<Option<Vec<_>>>()?
+        .into_iter()
+        .flatten()
+        .scan(0, |a, b| {
+            *a = *a + b;
+            Some(b)
+        })
+        .min();
+    if let Some(total) = total {
+        if total <= 0 {
+            Some((-total) as usize)
+        } else {
+            None
+        }
+    } else {
+        None
+    }
 }
 
 /// Run an image processing pipeline on a stack with the given initial contents.
@@ -101,7 +175,25 @@ pub fn paths_matching_pattern(pattern: &str) -> Result<Vec<PathBuf>> {
 }
 
 /// Load all images matching the given globs.
-pub fn load_inputs(input_patterns: &[String], verbose: bool) -> Result<Vec<DynamicImage>> {
+pub fn load_inputs_image(input_patterns: &[PathBuf], verbose: bool) -> Result<Vec<DynamicImage>> {
+    let mut inputs = Vec::with_capacity(input_patterns.len());
+    for path in input_patterns {
+        let image = open(&path).context(ImageOpenError { path: &path })?;
+        if verbose {
+            println!(
+                "Loaded input {:?} (width: {}, height: {})",
+                path,
+                image.width(),
+                image.height()
+            );
+        }
+        inputs.push(image);
+    }
+    Ok(inputs)
+}
+
+/// Load all images matching the given globs.
+pub fn load_inputs_filename(input_patterns: &[String], verbose: bool) -> Result<Vec<PathBuf>> {
     let mut inputs = Vec::new();
 
     for pattern in input_patterns {
@@ -114,28 +206,27 @@ pub fn load_inputs(input_patterns: &[String], verbose: bool) -> Result<Vec<Dynam
                 paths,
             );
         }
-
-        for path in &paths {
-            let image = open(&path).context(ImageOpenError { path: &path })?;
-            if verbose {
-                println!(
-                    "Loaded input {:?} (width: {}, height: {})",
-                    path,
-                    image.width(),
-                    image.height()
-                );
-            }
-            inputs.push(image);
-        }
+        inputs.extend(paths);
     }
 
     Ok(inputs)
 }
 
 /// Save images according to an `OutputSpec`.
-pub fn save_images(spec: &OutputSpec, images: &[DynamicImage], verbose: bool) -> Result<()> {
+pub fn save_images(
+    spec: &OutputSpec,
+    images: &[DynamicImage],
+    verbose: bool,
+    images_counter: Arc<Mutex<usize>>,
+) -> Result<()> {
+    let image_counter = {
+        let mut counter = images_counter.lock().unwrap();
+        let counter_copy = counter.clone();
+        counter.add_assign(images.len());
+        counter_copy
+    };
     for (index, image) in images.iter().enumerate() {
-        match spec.nth_output_path(index) {
+        match spec.nth_output_path(image_counter + index) {
             Some(path) => {
                 if verbose {
                     log_output(&image, &path);

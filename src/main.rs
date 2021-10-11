@@ -22,6 +22,10 @@ struct Opt {
     /// Ignore all the other flags and regenerate a user guide instead.
     #[structopt(long)]
     generate_guide: bool,
+
+    /// Enable parallelisation if possible.
+    #[structopt(long)]
+    parallel: bool,
 }
 
 fn main() {
@@ -30,7 +34,13 @@ fn main() {
     let result = if opt.generate_guide {
         generate_guide(opt.verbose)
     } else {
-        process(&opt.input, &opt.output, opt.pipeline, opt.verbose)
+        process(
+            &opt.input,
+            &opt.output,
+            opt.pipeline,
+            opt.verbose,
+            opt.parallel,
+        )
     };
 
     match result {

@@ -1,0 +1,4 @@
+project: imagecli
+target: imagecli
+cmds:
+  - cmd: ./target/release/imagecli -i @@ -o mayhem.png
